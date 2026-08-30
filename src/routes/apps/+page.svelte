@@ -11,7 +11,6 @@
   import * as Table from '$lib/components/ui/table/index.js';
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import * as Select from '$lib/components/ui/select/index.js';
-  import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import * as Alert from '$lib/components/ui/alert/index.js';
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -33,10 +32,8 @@
   import Square from '@lucide/svelte/icons/square';
   import Play from '@lucide/svelte/icons/play';
   import Trash2 from '@lucide/svelte/icons/trash-2';
-  import Save from '@lucide/svelte/icons/save';
   import Search from '@lucide/svelte/icons/search';
   import Boxes from '@lucide/svelte/icons/boxes';
-  import RefreshCcw from '@lucide/svelte/icons/refresh-ccw';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Check from '@lucide/svelte/icons/check';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -47,7 +44,6 @@
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
-  import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
   import X from '@lucide/svelte/icons/x';
 
   let { data } = $props();
@@ -405,27 +401,6 @@
     confirmOpen = true;
   }
 
-  function askBulk(action) {
-    const stopping = action === 'stopAll';
-    confirmState = {
-      title: stopping ? 'Stop every app?' : 'Restart every app?',
-      description: `This applies to all ${live.apps.length} apps managed on this machine, including this control panel if it is one of them.`,
-      label: stopping ? 'Stop all' : 'Restart all',
-      action: async () => {
-        const res = await api('/api/apps', { action });
-        const failed = res.results?.filter((r) => !r.ok) ?? [];
-        failed.length
-          ? toasts.error(`${failed.length} failed`, failed.map((f) => f.name).join(', '))
-          : toasts.ok('Done', `${res.results.length} apps updated.`);
-      },
-    };
-    confirmOpen = true;
-  }
-
-  async function save() {
-    await api('/api/apps', { action: 'save' });
-    toasts.ok('App list saved', 'PM2 will resurrect these on boot.');
-  }
 </script>
 
 <svelte:head><title>Apps · {data.host?.hostname}</title></svelte:head>
@@ -484,39 +459,9 @@
       </Select.Content>
     </Select.Root>
 
-    <div class="bg-border mx-0.5 hidden h-6 w-px sm:block"></div>
-
     <Button onclick={openWizard} class="accent-fill h-9 rounded-xl px-4 font-semibold">
       <Plus class="size-4" /> Deploy app
     </Button>
-
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger>
-        {#snippet child({ props })}
-          <Button
-            {...props}
-            variant="ghost"
-            size="icon"
-            aria-label="More actions"
-            class="size-9 shrink-0 rounded-xl"
-          >
-            <EllipsisVertical class="size-4" />
-          </Button>
-        {/snippet}
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="end" class="w-52">
-        <DropdownMenu.Item disabled={!live.apps.length} onSelect={() => askBulk('restartAll')}>
-          <RefreshCcw class="size-4" /> Restart all apps
-        </DropdownMenu.Item>
-        <DropdownMenu.Item disabled={!live.online} onSelect={() => askBulk('stopAll')}>
-          <Square class="size-4" /> Stop all apps
-        </DropdownMenu.Item>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item disabled={!live.apps.length} onSelect={save}>
-          <Save class="size-4" /> Save list for boot
-        </DropdownMenu.Item>
-      </DropdownMenu.Content>
-    </DropdownMenu.Root>
   {/snippet}
 </PageHeader>
 

@@ -6,7 +6,7 @@ const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
 /** @type {import('@sveltejs/kit').Config} */
 export default {
   kit: {
-    adapter: adapter({ out: 'build' }),
+    adapter: adapter({ out: process.env.SCP_BUILD_OUT || 'build' }),
     alias: { $srv: 'src/lib/server' },
     // Surfaced by /api/health so a deployment can be identified.
     version: { name: pkg.version },

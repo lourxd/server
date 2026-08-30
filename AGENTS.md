@@ -351,13 +351,18 @@ cause is fixed. `rm -rf .next` before rebuilding. The panel does not do this
 automatically — deleting a user's build output on their behalf is not ours to
 decide.
 
-**Rebuilding in place kills the running panel.** `adapter-node` serves static
-assets through sirv, which caches the file manifest at boot; `npm run build`
-replaces those hashed files underneath it, and the next request for an old chunk
-makes a ReadStream emit an unhandled `ENOENT` that takes the process down. It is
-fatal, not a 404. systemd restarts it, so it self-heals, but in-flight requests
-die — and `install.sh` builds in the install directory, so an upgrade does this
-to a live panel. Build elsewhere and swap, or expect the bounce.
+**Never run `npm run build` against a live panel — use `npm run build:safe`.**
+`vite build` rewrites `build/` in place, deleting and re-emitting hashed chunks,
+which breaks the running process two ways: sirv caches its file manifest at boot
+and a request for a removed asset makes a ReadStream emit an unhandled `ENOENT`
+that kills the process, and a half-written `build/` leaves the server importing
+chunk names that no longer exist (`Cannot find module .../nodes/0.js-XXXX.js`,
+500 on every route). Both have happened here. `scripts/build.sh` builds into
+`.build-staging` via `SCP_BUILD_OUT` and renames it into place, so the live
+build is never partial and a failed build leaves the previous one untouched.
+It does NOT remove the need to restart afterwards: the running process still
+holds the old manifest, so the sequence is `npm run build:safe && systemctl
+--user restart control-panel`.
 
 **`si.networkStats()` with no argument returns only the default interface.**
 Pass `'*'` for all of them. The interfaces table silently showed exactly one row

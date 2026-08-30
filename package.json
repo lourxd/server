@@ -12,7 +12,8 @@
     "start": "node build/index.js",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "db:check": "drizzle-kit check"
+    "db:check": "drizzle-kit check",
+    "build:safe": "bash scripts/build.sh"
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.3",

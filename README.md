@@ -98,9 +98,14 @@ should not take sites offline.
 
 ```bash
 npm install
-npm run build
+npm run build:safe
 npm start
 ```
+
+`build:safe` builds into a staging directory and renames it into place. Use it
+over `npm run build` whenever the panel is running: an in-place build replaces
+hashed chunks under the live process, which then 500s on every route until it
+restarts.
 
 Open `http://<host>:8088`. On first run every route redirects to `/setup`, where
 you create the owner account. That account becomes an **admin**, and sign-ups
