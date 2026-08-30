@@ -198,6 +198,43 @@ export async function connectDatabase(input) {
   return { ...(await saveConnection({ ...conn, name })), probe: result };
 }
 
+const DEFAULT_VAR = {
+  postgres: 'DATABASE_URL',
+  mysql: 'DATABASE_URL',
+  mongodb: 'MONGODB_URI',
+  redis: 'REDIS_URL',
+  sqlite: 'DATABASE_URL',
+};
+
+export const defaultVarFor = (type) => DEFAULT_VAR[type] ?? 'DATABASE_URL';
+
+const SCHEME_FOR = {
+  postgres: 'postgresql',
+  mysql: 'mysql',
+  mongodb: 'mongodb',
+  redis: 'redis',
+};
+
+export function connectionUrl(conn) {
+  if (conn.type === 'sqlite') return `file:${conn.file}`;
+  if (conn.url) return conn.url;
+
+  const scheme = SCHEME_FOR[conn.type];
+  if (!scheme) throw new Error(`Cannot build a connection string for ${conn.type}.`);
+
+  const url = new URL(`${scheme}://placeholder`);
+  url.hostname = conn.host || '127.0.0.1';
+  if (conn.port) url.port = String(conn.port);
+  if (conn.user) url.username = encodeURIComponent(conn.user);
+  if (conn.password) url.password = encodeURIComponent(conn.password);
+  if (conn.database) url.pathname = `/${conn.database}`;
+  if (conn.ssl) {
+    if (conn.type === 'postgres' || conn.type === 'mysql') url.searchParams.set('sslmode', 'require');
+    else url.searchParams.set('tls', 'true');
+  }
+  return url.toString();
+}
+
 export async function createDatabase(input) {
   const engine = ENGINE_BY_TYPE[input.type];
   if (!engine) throw new Error(`Unsupported database type: ${input.type}`);

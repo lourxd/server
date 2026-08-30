@@ -31,6 +31,7 @@
   import Eraser from '@lucide/svelte/icons/eraser';
   import Save from '@lucide/svelte/icons/save';
   import Database from '@lucide/svelte/icons/database';
+  import Link2Off from '@lucide/svelte/icons/link-2-off';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 
   let { data } = $props();
@@ -44,6 +45,34 @@
   let envConfirm = $state(false);
 
   const envDirty = $derived(JSON.stringify(envVars) !== JSON.stringify(data.envVars));
+
+  let dbBusy = $state(false);
+  let detachConfirm = $state(false);
+
+  const attachedDb = $derived(data.databases.find((c) => c.id === data.attached.id) ?? null);
+  const logoFor = (conn) => data.catalogue.find((e) => e.type === conn.type)?.logo ?? 'sqlite';
+
+  async function attach(conn) {
+    dbBusy = true;
+    try {
+      await api('/api/apps', { action: 'attach-db', id: data.proc.pmId, connectionId: conn.id });
+      toasts.ok('Database attached', `${conn.name} · ${app.name} restarted`);
+      await invalidateAll();
+    } finally {
+      dbBusy = false;
+    }
+  }
+
+  async function detach() {
+    dbBusy = true;
+    try {
+      await api('/api/apps', { action: 'detach-db', id: data.proc.pmId });
+      toasts.ok('Database detached', `${app.name} restarted`);
+      await invalidateAll();
+    } finally {
+      dbBusy = false;
+    }
+  }
 
   const app = $derived(live.apps.find((x) => x.pmId === data.proc.pmId) ?? data.proc);
 
@@ -308,23 +337,112 @@
       </div>
     </Tabs.Content>
 
-    <Tabs.Content value="database">
-      <div class="panel flex flex-col items-center gap-3 rounded-2xl px-6 py-16 text-center">
-        <div class="panel grid size-12 place-items-center rounded-full">
-          <Database class="text-muted-foreground size-5" />
+    <Tabs.Content value="database" class="space-y-3">
+      {#if attachedDb}
+        <div class="panel-raised flex flex-wrap items-center gap-3.5 rounded-2xl p-4.5">
+          <div class="bg-foreground/8 grid size-10 shrink-0 place-items-center rounded-xl">
+            <TechLogo name={logoFor(attachedDb)} class="size-5" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <p class="truncate text-[14.5px] font-semibold">{attachedDb.name}</p>
+              {#if attachedDb.remote}
+                <Badge variant="outline" class="border-info/40 text-info font-mono text-[10px]">remote</Badge>
+              {/if}
+            </div>
+            <p class="text-muted-foreground truncate font-mono text-[10.5px]">
+              {attachedDb.type === 'sqlite'
+                ? attachedDb.file
+                : `${attachedDb.host}:${attachedDb.port}${attachedDb.database ? ` / ${attachedDb.database}` : ''}`}
+            </p>
+          </div>
+          <div class="panel rounded-lg px-2.5 py-1.5 font-mono text-[11px]">
+            {data.attached.varName ?? 'DATABASE_URL'}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-8 rounded-lg"
+            disabled={dbBusy}
+            onclick={() => (detachConfirm = true)}
+          >
+            {#if dbBusy}<LoaderCircle class="size-3.5 animate-spin" />{:else}<Link2Off class="size-3.5" />{/if}
+            Detach
+          </Button>
         </div>
-        <div>
-          <p class="font-semibold">No database attached</p>
-          <p class="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
-            Databases are not implemented yet. This is where you will attach one to {app.name} and
-            have its connection details injected as environment variables.
-          </p>
+
+        <p class="text-muted-foreground text-[11.5px]">
+          The connection string is written to <code class="font-mono">.env</code> in the project at
+          mode 0600 as
+          <code class="font-mono">{data.attached.varName ?? 'DATABASE_URL'}</code>, never passed to
+          PM2. Read it with <code class="font-mono">process.env.{data.attached.varName ?? 'DATABASE_URL'}</code>.
+        </p>
+      {:else if data.databases.length}
+        <p class="text-muted-foreground text-[12.5px]">
+          Attaching writes the connection string into the project's
+          <code class="font-mono">.env</code> and restarts {app.name}.
+        </p>
+
+        <div class="grid gap-2.5 lg:grid-cols-2">
+          {#each data.databases as conn (conn.id)}
+            <div class="panel flex items-center gap-3 rounded-2xl p-3.5">
+              <div class="bg-foreground/6 grid size-9 shrink-0 place-items-center rounded-xl">
+                <TechLogo name={logoFor(conn)} class="size-4.5" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <p class="truncate text-[13.5px] font-semibold">{conn.name}</p>
+                  {#if conn.remote}
+                    <Badge variant="outline" class="border-info/40 text-info font-mono text-[9.5px]">
+                      remote
+                    </Badge>
+                  {/if}
+                </div>
+                <p class="text-muted-foreground truncate font-mono text-[10.5px]">
+                  {conn.type === 'sqlite' ? conn.file : `${conn.host}:${conn.port}`}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                class="panel h-8 shrink-0 rounded-lg px-3"
+                disabled={dbBusy}
+                onclick={() => attach(conn)}
+              >
+                Attach
+              </Button>
+            </div>
+          {/each}
         </div>
-      </div>
+      {:else}
+        <div class="panel flex flex-col items-center gap-3 rounded-2xl px-6 py-16 text-center">
+          <div class="panel grid size-12 place-items-center rounded-full">
+            <Database class="text-muted-foreground size-5" />
+          </div>
+          <div>
+            <p class="font-semibold">No databases yet</p>
+            <p class="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
+              Create one on this machine, or connect one you already run elsewhere, then attach it
+              here.
+            </p>
+          </div>
+          <Button href="/databases" class="accent-fill mt-1 rounded-xl px-4 font-semibold">
+            Go to Databases
+          </Button>
+        </div>
+      {/if}
     </Tabs.Content>
 
   </Tabs.Root>
 </div>
+
+<ConfirmDialog
+  bind:open={detachConfirm}
+  title="Detach {attachedDb?.name} from {app.name}?"
+  description="The connection string is removed from the project's .env and the app restarts. The database itself is untouched."
+  confirmLabel="Detach"
+  onconfirm={detach}
+/>
 
 <ConfirmDialog
   bind:open={envConfirm}

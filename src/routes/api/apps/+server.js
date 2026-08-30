@@ -3,6 +3,65 @@ import * as pm2 from '$srv/pm2.js';
 import { safeRepoPath } from '$srv/repos.js';
 import { STACK_BY_ID } from '$lib/stacks.js';
 import { checkPort } from '$srv/ports.js';
+import { getConnection } from '$srv/store/connections.js';
+import { connectionUrl, defaultVarFor } from '$srv/db/provision.js';
+
+const DB_MARKER = 'SCP_DB';
+
+function readEnvFile(cwd) {
+  const out = {};
+  try {
+    for (const raw of fs.readFileSync(path.join(cwd, '.env'), 'utf8').split('\n')) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq < 1) continue;
+      const key = line.slice(0, eq).replace(/^export\s+/, '').trim();
+      let value = line.slice(eq + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      if (key) out[key] = value;
+    }
+  } catch {
+  }
+  return out;
+}
+
+async function attachDatabase(body) {
+  const target = body.id ?? body.name;
+  if (target === undefined || target === null || target === '') error(400, 'A process id or name is required.');
+
+  const proc = await pm2.describe(target);
+  const plain = pm2.appEnv(proc.env);
+  const secrets = readEnvFile(proc.cwd);
+
+  let marker;
+  let varName = String(body.varName ?? '').trim();
+
+  if (body.detach) {
+    varName = varName || proc.env?.[`${DB_MARKER}_VAR`] || '';
+    if (varName) delete secrets[varName];
+    marker = null;
+  } else {
+    const conn = await getConnection(body.connectionId);
+    varName = varName || defaultVarFor(conn.type);
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(varName)) error(400, `Invalid variable name: ${varName}`);
+    secrets[varName] = connectionUrl(conn);
+    marker = conn.id;
+  }
+
+  const envVars = [
+    ...Object.entries(plain).map(([key, value]) => ({ key, value, secret: false })),
+    ...Object.entries(secrets).map(([key, value]) => ({ key, value, secret: true })),
+  ];
+  if (marker) {
+    envVars.push({ key: DB_MARKER, value: marker, secret: false });
+    envVars.push({ key: `${DB_MARKER}_VAR`, value: varName, secret: false });
+  }
+
+  return updateEnv({ id: proc.pmId, envVars });
+}
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -42,6 +101,10 @@ export async function POST({ request }) {
 
     if (action === 'start') {
       return json({ ok: true, result: await startProcess(body) });
+    }
+
+    if (action === 'attach-db' || action === 'detach-db') {
+      return json(await attachDatabase({ ...body, detach: action === 'detach-db' }));
     }
 
     if (action === 'update-env') {

@@ -177,7 +177,9 @@ and reconnects to the daemon on its own.
   that owns it.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail in tabs — Overview, Environment, Database, Logs — with a live log
-  stream. Environment variables are editable there: saving rewrites the app's
+  stream. The Database tab attaches any saved connection, local or remote:
+  its connection string is written into the project's `.env` as
+  `DATABASE_URL` (or `MONGODB_URI`, `REDIS_URL`) and the app restarts. Environment variables are editable there: saving rewrites the app's
   environment and restarts it. The deploy wizard checks the port is actually
   free before starting, and names whatever holds it.
 - **Settings** — Projects directory, storage paths, the machine and
