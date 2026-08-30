@@ -424,6 +424,13 @@ Do not treat these as bugs to discover — they are known and deferred.
   split across Overview (compute, storage, processes), Network (interfaces and
   throughput) and Settings' System tab (the static machine/toolchain readout).
   Overview is a long scrolling page now, not a viewport-height dashboard.
+- **DNS record management is Cloudflare-only; resolution is not.** `resolve()`
+  uses `node:dns` against 1.1.1.1 and 8.8.8.8 and needs no account, so the
+  Lookup tool works with no token. Managing records elsewhere means a provider
+  interface with Cloudflare as one driver — the shape to aim for if this grows.
+  Running an authoritative nameserver on the box is not viable: port 53 is
+  EACCES for the panel's user, `systemd-resolved` already holds 127.0.0.53:53,
+  and the machine is behind NAT (192.168.50.227 vs 85.246.175.66).
 - **Tunnels and DNS live as tabs on Network**, not as pages of their own — a
   route and the interface it exits through are the same question. The backend
   (`server/cloudflare/`) was always intact; only the UI had been removed.

@@ -44,6 +44,25 @@
   let confirmOpen = $state(false);
   let confirmState = $state({ title: '', description: '', label: '', action: null });
 
+  let lookupName = $state('');
+  let lookupType = $state('A');
+  let lookupBusy = $state(false);
+  let lookupResult = $state(null);
+
+  async function lookup() {
+    const hostname = lookupName.trim();
+    if (!hostname) return;
+    lookupBusy = true;
+    lookupResult = null;
+    try {
+      lookupResult = await apiGet('/api/dns', { op: 'resolve', hostname, type: lookupType });
+    } catch (err) {
+      lookupResult = { ok: false, reason: err.message };
+    } finally {
+      lookupBusy = false;
+    }
+  }
+
   const zone = $derived(data.zones.find((z) => z.id === zoneId) ?? null);
   const shown = $derived(
     filter
@@ -126,6 +145,60 @@
     }
   }
 </script>
+
+<div class="panel-raised space-y-3 rounded-2xl p-4.5">
+  <div class="flex items-baseline gap-2">
+    <span class="eyebrow">Lookup</span>
+    <span class="text-muted-foreground ml-auto font-mono text-[10.5px]">1.1.1.1 · 8.8.8.8</span>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-2">
+    <Input
+      bind:value={lookupName}
+      onkeydown={(e) => e.key === 'Enter' && lookup()}
+      placeholder="example.com"
+      spellcheck="false"
+      class="h-8.5 flex-1 rounded-xl font-mono text-[12px]"
+    />
+    <Select.Root type="single" bind:value={lookupType}>
+      <Select.Trigger class="h-8.5 w-24 rounded-xl">{lookupType}</Select.Trigger>
+      <Select.Content>
+        {#each TYPES as t (t)}<Select.Item value={t}>{t}</Select.Item>{/each}
+      </Select.Content>
+    </Select.Root>
+    <Button
+      size="sm"
+      class="accent-fill h-8.5 rounded-xl px-4 font-semibold"
+      disabled={lookupBusy || !lookupName.trim()}
+      onclick={lookup}
+    >
+      {#if lookupBusy}<LoaderCircle class="size-3.5 animate-spin" />{:else}<Search class="size-3.5" />{/if}
+      Resolve
+    </Button>
+  </div>
+
+  {#if lookupResult}
+    <div class="panel rounded-xl p-3">
+      {#if lookupResult.ok}
+        <p class="text-muted-foreground mb-1.5 font-mono text-[10.5px]">
+          {lookupResult.answers.length} answer{lookupResult.answers.length === 1 ? '' : 's'} in {lookupResult.durationMs}ms
+        </p>
+        <div class="space-y-0.5">
+          {#each lookupResult.answers as a, i (i)}
+            <p class="font-mono text-[12px] break-all">{a}</p>
+          {/each}
+        </div>
+      {:else}
+        <p class="text-bad font-mono text-[12px]">{lookupResult.reason ?? 'No answer.'}</p>
+      {/if}
+    </div>
+  {:else}
+    <p class="text-muted-foreground text-[11.5px]">
+      Resolves against public resolvers, so it works for any domain — no Cloudflare account
+      involved, and it shows what the internet sees rather than what a provider has stored.
+    </p>
+  {/if}
+</div>
 
 {#if !data.cloudflare.connected}
   <Alert.Root>
