@@ -186,6 +186,7 @@ sed -e "s|__USER__|$TARGET_USER|g" \
     -e "s|__GROUP__|$TARGET_GROUP|g" \
     -e "s|__INSTALL_DIR__|$INSTALL_DIR|g" \
     -e "s|__NODE__|$NODE_BIN|g" \
+    -e "s|__NODE_BIN_DIR__|$(dirname "$NODE_BIN")|g" \
     "$INSTALL_DIR/deploy/control-panel.service" > "$UNIT"
 
 systemctl daemon-reload

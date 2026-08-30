@@ -1,10 +1,20 @@
 import { spawn } from 'node:child_process';
+import path from 'node:path';
+
+const NODE_BIN_DIR = path.dirname(process.execPath);
+
+function withNodeOnPath(pathValue) {
+  const parts = (pathValue || '').split(path.delimiter).filter(Boolean);
+  if (parts.includes(NODE_BIN_DIR)) return pathValue;
+  return [NODE_BIN_DIR, ...parts].join(path.delimiter);
+}
 
 function childEnv(env) {
   const merged = { ...process.env, ...env };
   for (const [key, value] of Object.entries(merged)) {
     if (value == null) delete merged[key];
   }
+  merged.PATH = withNodeOnPath(merged.PATH);
   return merged;
 }
 

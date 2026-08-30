@@ -16,6 +16,9 @@ WorkingDirectory=__INSTALL_DIR__
 ExecStart=__NODE__ __INSTALL_DIR__/build/index.js
 
 Environment=NODE_ENV=production
+# systemd's default PATH has no nvm directory, so `npm` and friends would not
+# resolve for spawned builds. exec.js also prepends this at runtime.
+Environment=PATH=__NODE_BIN_DIR__:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=__INSTALL_DIR__/.env
 
 Restart=always

@@ -290,6 +290,14 @@ internally. Grep the whole tree, `ui/` included.
 was called by `realtime.js` but not exported from `pm2.js`; the build succeeded
 and shutdown would have thrown.
 
+**A systemd unit's PATH has no nvm directory.** The unit starts the panel with
+an absolute path to node, so the panel itself runs — but every spawned `npm`,
+`npx`, `pnpm` or `yarn` fails with `spawn npm ENOENT`, and only after a clone
+has already succeeded (git lives in /usr/bin). `exec.js` prepends
+`dirname(process.execPath)` to `PATH` for every child, so builds use the same
+toolchain that runs the panel regardless of how it was launched; the unit sets
+`PATH` too.
+
 **Never put a secret in PM2's environment.** `pm2 save` serialises every
 process's env into `~/.pm2/dump.pm2`, which PM2 creates **0664** inside a **0775**
 directory — world-readable to every local account. Secrets go into a `.env` file
