@@ -156,6 +156,25 @@ export async function list() {
   return procs.map(shapeProcess);
 }
 
+const SYSTEM_ENV = new Set([
+  'PWD', 'OLDPWD', 'HOME', 'SHELL', 'USER', 'LOGNAME', 'PATH', 'LANG', 'LC_ALL', 'TERM', 'SHLVL',
+  '_', 'TMPDIR', 'XDG_DATA_DIRS', 'XDG_RUNTIME_DIR', 'XDG_SESSION_TYPE', 'XDG_SESSION_CLASS',
+  'XDG_SESSION_ID', 'SYSTEMD_EXEC_PID', 'INVOCATION_ID', 'JOURNAL_STREAM', 'MEMORY_PRESSURE_WATCH',
+  'MEMORY_PRESSURE_WRITE', 'MANAGERPID', 'DBUS_SESSION_BUS_ADDRESS', 'MOTD_SHOWN', 'SSH_CONNECTION',
+  'SSH_CLIENT', 'SSH_TTY', 'HOSTNAME', 'NVM_DIR', 'NVM_BIN', 'NVM_INC', 'NVM_CD_FLAGS',
+]);
+
+const PANEL_ENV = /^(PM2|PM_|SCP_|PM2D_|npm_|NODE_OPTIONS$|unique_id$|axm_)/i;
+
+export function appEnv(env) {
+  return Object.fromEntries(
+    Object.entries(env || {}).filter(
+      ([k, v]) =>
+        typeof v === 'string' && k === k.toUpperCase() && !SYSTEM_ENV.has(k) && !PANEL_ENV.test(k),
+    ),
+  );
+}
+
 export async function describe(id) {
   const [p] = await call('describe', id);
   if (!p) throw new Error(`process "${id}" not found`);

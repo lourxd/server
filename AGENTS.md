@@ -305,6 +305,15 @@ has already succeeded (git lives in /usr/bin). `exec.js` prepends
 toolchain that runs the panel regardless of how it was launched; the unit sets
 `PATH` too.
 
+**Changing an app's environment means delete + start, not restart.** PM2's
+`restart` with `updateEnv: true` rebuilds the child env from the PANEL's
+`process.env` (`Common.safeExtend({}, process.env)` when `PM2_PROGRAMMATIC` is
+set) — the same leak that once made PM2 relaunch the panel instead of the app.
+`updateEnv` is off the table. `update-env` in `api/apps` reconstructs the
+options from `describe`, deletes, and starts again through the hardened
+`startProcess` path, rolling back to the previous env if the new start fails.
+The pm_id changes, so the client follows the redirect.
+
 **Never put a secret in PM2's environment.** `pm2 save` serialises every
 process's env into `~/.pm2/dump.pm2`, which PM2 creates **0664** inside a **0775**
 directory — world-readable to every local account. Secrets go into a `.env` file

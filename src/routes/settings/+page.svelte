@@ -228,7 +228,7 @@
 
 <svelte:head><title>Settings · {data.host?.hostname}</title></svelte:head>
 
-<PageHeader title="Settings" subtitle="integrations · account · access">
+<PageHeader title="Settings" icon={SlidersHorizontal} subtitle="integrations · account · access">
   {#snippet actions()}
     <span class="panel tabular text-muted-foreground rounded-full px-3 py-1.5 font-mono text-[11px]">
       {data.sessions} session{data.sessions === 1 ? '' : 's'}

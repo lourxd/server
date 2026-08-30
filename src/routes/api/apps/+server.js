@@ -44,6 +44,10 @@ export async function POST({ request }) {
       return json({ ok: true, result: await startProcess(body) });
     }
 
+    if (action === 'update-env') {
+      return json(await updateEnv(body));
+    }
+
     if (action === 'save') {
       await pm2.dump();
       return json({ ok: true, action: 'save' });
@@ -72,6 +76,41 @@ async function assertPortFree(port, { force = false } = {}) {
   const result = await checkPort(port);
   if (result.free || !result.valid) return;
   error(409, `${result.reason} Choose another port, or stop what is holding it.`);
+}
+
+async function updateEnv(body) {
+  const target = body.id ?? body.name;
+  if (target === undefined || target === null || target === '') error(400, 'A process id or name is required.');
+
+  const proc = await pm2.describe(target);
+
+  const rebuilt = {
+    cwd: proc.cwd,
+    name: proc.name,
+    script: proc.script,
+    args: Array.isArray(proc.args) ? proc.args.join(' ') : proc.args,
+    execMode: proc.execMode === 'cluster_mode' ? 'cluster' : 'fork',
+    instances: proc.instances,
+    watch: proc.watching,
+    autorestart: proc.autorestart,
+    maxMemory: proc.maxMemoryRestart || '',
+    interpreter: proc.interpreter && proc.interpreter !== 'node' ? proc.interpreter : '',
+    stack: proc.stack || undefined,
+    envVars: body.envVars,
+    forcePort: true,
+  };
+
+  await pm2.del(proc.pmId);
+  try {
+    const result = await startProcess(rebuilt);
+    return { ok: true, restarted: true, result };
+  } catch (err) {
+    try {
+      await startProcess({ ...rebuilt, envVars: undefined, env: proc.env });
+    } catch {
+    }
+    error(500, `Could not restart ${proc.name} with the new environment: ${err?.body?.message ?? err.message}`);
+  }
 }
 
 async function startProcess(body) {

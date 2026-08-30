@@ -11,6 +11,7 @@
   import * as Table from '$lib/components/ui/table/index.js';
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import * as Select from '$lib/components/ui/select/index.js';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import * as Alert from '$lib/components/ui/alert/index.js';
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -46,10 +47,13 @@
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
+  import X from '@lucide/svelte/icons/x';
 
   let { data } = $props();
 
   let statusFilter = $state('all');
+  let query = $state('');
   let busy = $state(new Set());
 
   const FILTERS = [
@@ -65,6 +69,12 @@
     errored: live.errored,
     stopped: live.stopped,
   });
+
+  const activeFilter = $derived(FILTERS.find((f) => f.id === statusFilter) ?? FILTERS[0]);
+
+  const summary = $derived(
+    FILTERS.filter((f) => f.id !== 'all').map((f) => ({ ...f, count: counts[f.id] })),
+  );
 
   const cpuHistory = new Map();
   const sparkFor = (app) => {
@@ -356,9 +366,14 @@
     wizardOpen = false;
   }
 
-  const shown = $derived(
-    statusFilter === 'all' ? live.apps : live.apps.filter((a) => a.status === statusFilter),
-  );
+  const shown = $derived.by(() => {
+    const q = query.trim().toLowerCase();
+    return live.apps.filter(
+      (a) =>
+        (statusFilter === 'all' || a.status === statusFilter) &&
+        (!q || `${a.name} ${a.script ?? ''}`.toLowerCase().includes(q)),
+    );
+  });
 
   function setBusy(id, on) {
     const next = new Set(busy);
@@ -415,47 +430,97 @@
 
 <svelte:head><title>Apps · {data.host?.hostname}</title></svelte:head>
 
-<PageHeader
-  title="Applications"
-  subtitle="{live.online} running · {live.errored} errored"
->
+<PageHeader title="Applications" icon={Boxes}>
+  {#snippet meta()}
+    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+      {#each summary as s (s.id)}
+        <span class="text-muted-foreground flex items-center gap-1.5 font-mono text-[11px]">
+          <span class="dot" style="color:{s.tone}"></span>
+          <span class="tabular text-foreground/85">{s.count}</span>
+          {s.label.toLowerCase()}
+        </span>
+      {/each}
+    </div>
+  {/snippet}
+
   {#snippet actions()}
-    <Button onclick={openWizard} class="accent-fill h-8.5 rounded-xl px-4 font-semibold">
+    <div class="relative">
+      <Search
+        class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2"
+      />
+      <Input
+        placeholder="Search apps…"
+        bind:value={query}
+        class="h-9 w-40 rounded-xl pr-8 pl-8.5 text-[12.5px] lg:w-56"
+      />
+      {#if query}
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Clear search"
+          onclick={() => (query = '')}
+          class="text-muted-foreground hover:text-foreground absolute top-1/2 right-1.5 -translate-y-1/2 rounded-lg"
+        >
+          <X class="size-3.5" />
+        </Button>
+      {/if}
+    </div>
+
+    <Select.Root type="single" bind:value={statusFilter}>
+      <Select.Trigger class="w-34 rounded-xl pl-3 text-[12.5px] data-[size=default]:h-9">
+        <span class="flex items-center gap-2">
+          <span class="dot" style="color:{activeFilter.tone}"></span>
+          {activeFilter.label}
+        </span>
+      </Select.Trigger>
+      <Select.Content align="end" class="min-w-44">
+        {#each FILTERS as f (f.id)}
+          <Select.Item value={f.id}>
+            <span class="dot shrink-0" style="color:{f.tone}"></span>
+            {f.label}
+            <span class="tabular text-muted-foreground ml-auto font-mono text-[11px]">{counts[f.id]}</span>
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+
+    <div class="bg-border mx-0.5 hidden h-6 w-px sm:block"></div>
+
+    <Button onclick={openWizard} class="accent-fill h-9 rounded-xl px-4 font-semibold">
       <Plus class="size-4" /> Deploy app
     </Button>
+
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger>
+        {#snippet child({ props })}
+          <Button
+            {...props}
+            variant="ghost"
+            size="icon"
+            aria-label="More actions"
+            class="size-9 shrink-0 rounded-xl"
+          >
+            <EllipsisVertical class="size-4" />
+          </Button>
+        {/snippet}
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content align="end" class="w-52">
+        <DropdownMenu.Item disabled={!live.apps.length} onSelect={() => askBulk('restartAll')}>
+          <RefreshCcw class="size-4" /> Restart all apps
+        </DropdownMenu.Item>
+        <DropdownMenu.Item disabled={!live.online} onSelect={() => askBulk('stopAll')}>
+          <Square class="size-4" /> Stop all apps
+        </DropdownMenu.Item>
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item disabled={!live.apps.length} onSelect={save}>
+          <Save class="size-4" /> Save list for boot
+        </DropdownMenu.Item>
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
   {/snippet}
 </PageHeader>
 
 <div class="flex flex-1 flex-col gap-3.5 p-5 pt-3.5 md:p-6 md:pt-3.5">
-
-  <div class="flex flex-wrap items-center gap-2">
-    {#each FILTERS as f (f.id)}
-      <button
-        type="button"
-        onclick={() => (statusFilter = f.id)}
-        class={cn(
-          'inline-flex h-8 items-center gap-2 rounded-xl px-3 text-[12.5px] transition-all',
-          statusFilter === f.id ? 'accent-wash text-foreground' : 'panel text-muted-foreground hover:brightness-125',
-        )}
-      >
-        <span class="size-1.5 rounded-full" style="background:{f.tone}"></span>
-        {f.label}
-        <span class="tabular text-muted-foreground font-mono text-[11px]">{counts[f.id]}</span>
-      </button>
-    {/each}
-
-    <div class="ml-auto flex flex-wrap gap-2">
-      <Button variant="ghost" size="sm" class="panel h-8 rounded-xl" disabled={!live.apps.length} onclick={() => askBulk('restartAll')}>
-        <RefreshCcw class="size-3.5" /> Restart all
-      </Button>
-      <Button variant="ghost" size="sm" class="panel h-8 rounded-xl" disabled={!live.online} onclick={() => askBulk('stopAll')}>
-        <Square class="size-3.5" /> Stop all
-      </Button>
-      <Button variant="ghost" size="sm" class="panel h-8 rounded-xl" disabled={!live.apps.length} onclick={save}>
-        <Save class="size-3.5" /> Save list
-      </Button>
-    </div>
-  </div>
 
   {#if !live.apps.length}
     <div class="panel flex flex-col items-center gap-3 rounded-2xl px-6 py-20 text-center">
@@ -555,7 +620,11 @@
 
       {#if !shown.length}
         <div class="panel text-muted-foreground rounded-2xl py-14 text-center text-sm">
-          No {statusFilter} apps.
+          {#if query}
+            No apps match “{query}”.
+          {:else}
+            No {activeFilter.label.toLowerCase()} apps.
+          {/if}
         </div>
       {/if}
     </div>

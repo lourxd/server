@@ -6,7 +6,6 @@
 
   import * as Card from '$lib/components/ui/card/index.js';
   import * as Tabs from '$lib/components/ui/tabs/index.js';
-  import * as Table from '$lib/components/ui/table/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
@@ -21,6 +20,7 @@
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import LogStream from '$lib/components/LogStream.svelte';
+  import EnvEditor from '$lib/components/EnvEditor.svelte';
 
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
@@ -29,6 +29,9 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import RefreshCcw from '@lucide/svelte/icons/refresh-ccw';
   import Eraser from '@lucide/svelte/icons/eraser';
+  import Save from '@lucide/svelte/icons/save';
+  import Database from '@lucide/svelte/icons/database';
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 
   let { data } = $props();
 
@@ -36,6 +39,11 @@
   let filter = $state('');
   let autoscroll = $state(true);
   let confirmOpen = $state(false);
+  let envVars = $state(structuredClone(data.envVars));
+  let savingEnv = $state(false);
+  let envConfirm = $state(false);
+
+  const envDirty = $derived(JSON.stringify(envVars) !== JSON.stringify(data.envVars));
 
   const app = $derived(live.apps.find((x) => x.pmId === data.proc.pmId) ?? data.proc);
 
@@ -51,6 +59,24 @@
     toasts.ok(`${app.name} ${action}ed`);
     if (action === 'delete') return goto('/apps');
     await invalidateAll();
+  }
+
+  async function saveEnv() {
+    savingEnv = true;
+    try {
+      const res = await api('/api/apps', {
+        action: 'update-env',
+        id: data.proc.pmId,
+        envVars: envVars.map(({ key, value, secret }) => ({ key, value, secret })),
+      });
+      toasts.ok('Environment saved', `${app.name} restarted`);
+      const next = res?.result?.[0]?.pm2_env?.pm_id ?? res?.result?.pm_id;
+      if (next != null && next !== data.proc.pmId) return goto(`/apps/${next}`, { invalidateAll: true });
+      await invalidateAll();
+      envVars = structuredClone(data.envVars);
+    } finally {
+      savingEnv = false;
+    }
   }
 
   async function reloadLogs() {
@@ -151,22 +177,38 @@
 </header>
 
 <div class="flex flex-1 flex-col gap-3.5 p-5 pt-3.5 md:p-6 md:pt-3.5">
-  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    {#each TILES as t (t.label)}
-      <div class="panel-raised rounded-2xl p-4">
-        <p class="eyebrow">{t.label}</p>
-        <p class="tabular mt-1 text-[27px] font-semibold">{t.value}</p>
-        <p class="text-muted-foreground mt-0.5 font-mono text-[10.5px]">{t.sub}</p>
-      </div>
-    {/each}
-  </div>
-
-  <Tabs.Root value="logs">
+  <Tabs.Root value="overview">
     <Tabs.List>
+      <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+      <Tabs.Trigger value="env" class="gap-1.5">
+        Environment
+        {#if envDirty}<span class="dot text-primary"></span>{/if}
+      </Tabs.Trigger>
+      <Tabs.Trigger value="database">Database</Tabs.Trigger>
       <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
-      <Tabs.Trigger value="config">Configuration</Tabs.Trigger>
-      <Tabs.Trigger value="env">Environment</Tabs.Trigger>
     </Tabs.List>
+
+    <Tabs.Content value="overview" class="space-y-3">
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {#each TILES as t (t.label)}
+          <div class="panel-raised rounded-2xl p-4">
+            <p class="eyebrow">{t.label}</p>
+            <p class="tabular mt-1 text-[27px] font-semibold">{t.value}</p>
+            <p class="text-muted-foreground mt-0.5 font-mono text-[10.5px]">{t.sub}</p>
+          </div>
+        {/each}
+      </div>
+
+      <div class="panel rounded-2xl p-4.5">
+        <span class="eyebrow">Configuration</span>
+        <dl class="mt-3 grid gap-x-6 gap-y-2.5 sm:grid-cols-[minmax(9rem,auto)_1fr]">
+          {#each CONFIG as [key, value] (key)}
+            <dt class="text-muted-foreground text-[12.5px]">{key}</dt>
+            <dd class="font-mono text-[11.5px] break-all">{value}</dd>
+          {/each}
+        </dl>
+      </div>
+    </Tabs.Content>
 
     <Tabs.Content value="logs">
       <Card.Root class="gap-0 py-0">
@@ -207,45 +249,69 @@
       </Card.Root>
     </Tabs.Content>
 
-    <Tabs.Content value="config">
-      <Card.Root>
-        <Card.Content>
-          <dl class="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[minmax(9rem,auto)_1fr]">
-            {#each CONFIG as [key, value] (key)}
-              <dt class="text-muted-foreground">{key}</dt>
-              <dd class="font-mono text-xs break-all">{value}</dd>
-            {/each}
-          </dl>
-        </Card.Content>
-      </Card.Root>
+
+    <Tabs.Content value="env" class="space-y-3">
+      <div class="panel-raised rounded-2xl p-4.5">
+        <EnvEditor bind:vars={envVars} />
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <p class="text-muted-foreground text-[11.5px]">
+          Saving restarts {app.name} — it has to start again to pick up a new environment.
+        </p>
+        <div class="ml-auto flex items-center gap-2">
+          {#if envDirty}
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-8.5 rounded-xl"
+              disabled={savingEnv}
+              onclick={() => (envVars = structuredClone(data.envVars))}
+            >
+              Discard
+            </Button>
+          {/if}
+          <Button
+            size="sm"
+            class="accent-fill h-8.5 rounded-xl px-4 font-semibold"
+            disabled={!envDirty || savingEnv}
+            onclick={() => (envConfirm = true)}
+          >
+            {#if savingEnv}
+              <LoaderCircle class="size-3.5 animate-spin" /> Saving…
+            {:else}
+              <Save class="size-3.5" /> Save and restart
+            {/if}
+          </Button>
+        </div>
+      </div>
     </Tabs.Content>
 
-    <Tabs.Content value="env">
-      <Card.Root class="gap-0 overflow-hidden py-0">
-        <Card.Header class="flex-row items-center gap-3 border-b py-3">
-          <Card.Title class="text-base">Environment variables</Card.Title>
-          <span class="text-muted-foreground ml-auto text-xs">{envEntries.length} variables</span>
-        </Card.Header>
-        <Table.Root>
-          <Table.Header>
-            <Table.Row class="hover:bg-transparent">
-              <Table.Head class="w-1/3">Name</Table.Head>
-              <Table.Head>Value</Table.Head>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {#each envEntries as [key, value] (key)}
-              <Table.Row>
-                <Table.Cell class="font-mono text-xs">{key}</Table.Cell>
-                <Table.Cell class="max-w-lg truncate font-mono text-xs" title={value}>{value}</Table.Cell>
-              </Table.Row>
-            {/each}
-          </Table.Body>
-        </Table.Root>
-      </Card.Root>
+    <Tabs.Content value="database">
+      <div class="panel flex flex-col items-center gap-3 rounded-2xl px-6 py-16 text-center">
+        <div class="panel grid size-12 place-items-center rounded-full">
+          <Database class="text-muted-foreground size-5" />
+        </div>
+        <div>
+          <p class="font-semibold">No database attached</p>
+          <p class="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
+            Databases are not implemented yet. This is where you will attach one to {app.name} and
+            have its connection details injected as environment variables.
+          </p>
+        </div>
+      </div>
     </Tabs.Content>
+
   </Tabs.Root>
 </div>
+
+<ConfirmDialog
+  bind:open={envConfirm}
+  title="Save environment and restart {app.name}?"
+  description="The app is removed from PM2 and started again with the new environment, so it will be briefly unreachable. Variables marked secret are written to a .env file in the project at mode 0600; the rest are passed to PM2."
+  confirmLabel="Save and restart"
+  onconfirm={saveEnv}
+/>
 
 <ConfirmDialog
   bind:open={confirmOpen}

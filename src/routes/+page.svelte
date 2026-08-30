@@ -14,6 +14,7 @@
 
   import Plus from '@lucide/svelte/icons/plus';
   import Boxes from '@lucide/svelte/icons/boxes';
+  import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
 
   let { data } = $props();
 
@@ -57,6 +58,7 @@
 
 <PageHeader
   title="Overview"
+  icon={LayoutDashboard}
   subtitle={m
     ? `${duration(m.uptime * 1000)} uptime · load ${m.cpu.loadavg.join(' ')}${slow?.temperature ? ` · ${slow.temperature.main}°C` : ''}`
     : 'connecting…'}

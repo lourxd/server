@@ -141,7 +141,7 @@
 
 <svelte:head><title>Repositories · {data.host?.hostname}</title></svelte:head>
 
-<PageHeader title="Repositories" subtitle="{data.repos.length} on this server">
+<PageHeader title="Repositories" icon={GitFork} subtitle="{data.repos.length} on this server">
   {#snippet actions()}
     <Button onclick={openClone} class="accent-fill h-8.5 rounded-xl px-4 font-semibold">
       <Plus class="size-4" /> Clone
