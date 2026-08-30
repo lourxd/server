@@ -144,11 +144,12 @@ and reconnects to the daemon on its own.
   memory, disk and network vitals; app roll-up and recent lifecycle events;
   per-core load and temperatures; 4-minute history for processor, memory,
   network and disk I/O; all filesystems; network interfaces; the top 25 OS
-  processes; and the hardware/toolchain readout.
+  processes.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail with a live log stream, config and environment.
-- **Settings** — Projects directory, GitHub and Cloudflare tokens, password,
-  users, and the audit log.
+- **Settings** — Projects directory, storage paths, the machine and
+  CPU/toolchain readout, GitHub and Cloudflare tokens, password, users, and the
+  audit log.
 
 System, Repositories, Databases, Tunnels and DNS no longer have pages of their
 own. System's panels all moved onto Overview. Repo

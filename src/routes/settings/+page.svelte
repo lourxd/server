@@ -2,8 +2,8 @@
   import { untrack } from 'svelte';
   import { invalidateAll, replaceState } from '$app/navigation';
   import { page } from '$app/state';
-  import { api, toasts } from '$lib/live.svelte.js';
-  import { relTime } from '$lib/format.js';
+  import { api, toasts, live } from '$lib/live.svelte.js';
+  import { relTime, bytes, duration } from '$lib/format.js';
   import { cn } from '$lib/utils.js';
   import { authClient } from '$lib/auth-client.js';
 
@@ -29,6 +29,8 @@
   import CircleAlert from '@lucide/svelte/icons/circle-alert';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+  import Server from '@lucide/svelte/icons/server';
+  import Cpu from '@lucide/svelte/icons/cpu';
   import UserRound from '@lucide/svelte/icons/user-round';
   import Users from '@lucide/svelte/icons/users';
   import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
@@ -45,7 +47,7 @@
 
   let { data } = $props();
 
-  const TABS = ['general', 'github', 'cloudflare', 'account', 'users'];
+  const TABS = ['general', 'system', 'github', 'cloudflare', 'account', 'users'];
   let tab = $state(untrack(() => {
     const t = page.url.searchParams.get('tab');
     return TABS.includes(t) ? t : 'general';
@@ -78,6 +80,28 @@
 
   let removeOpen = $state(false);
   let removeTarget = $state(null);
+
+  const MACHINE = $derived([
+    ['Hostname', data.host?.hostname],
+    ['Distribution', data.host?.distro],
+    ['Kernel', data.host?.kernel],
+    ['Architecture', data.host?.arch],
+    ['Manufacturer', data.host?.manufacturer ?? '—'],
+    ['Model', data.host?.model ?? '—'],
+    ['Virtualised', data.host?.virtual ? 'yes' : 'no'],
+    ['Uptime', live.metrics?.fast ? duration(live.metrics.fast.uptime * 1000) : '—'],
+  ]);
+
+  const TOOLCHAIN = $derived([
+    ['Processor', data.host?.cpuModel],
+    ['Cores', `${data.host?.cpuPhysicalCores} physical / ${data.host?.cpuCores} logical`],
+    ['Base clock', `${data.host?.cpuSpeedGhz} GHz`],
+    ['Total memory', bytes(data.host?.totalMemory)],
+    ['Node.js', `v${data.host?.node}`],
+    ['npm', data.host?.npm],
+    ['git', data.host?.git ?? '—'],
+    ['docker', data.host?.docker || 'not installed'],
+  ]);
 
   const pwValid = $derived(newPassword.length >= 10 && newPassword === confirmPassword && !!currentPassword);
 
@@ -218,6 +242,7 @@
       <Tabs.Trigger value="general" class="gap-1.5">
         <SlidersHorizontal class="size-3.5" /> General
       </Tabs.Trigger>
+      <Tabs.Trigger value="system" class="gap-1.5"><Server class="size-3.5" /> System</Tabs.Trigger>
       <Tabs.Trigger value="github" class="gap-1.5"><GitFork class="size-3.5" /> GitHub</Tabs.Trigger>
       <Tabs.Trigger value="cloudflare" class="gap-1.5"><Cloud class="size-3.5" /> Cloudflare</Tabs.Trigger>
       <Tabs.Trigger value="account" class="gap-1.5"><UserRound class="size-3.5" /> Account</Tabs.Trigger>
@@ -267,6 +292,40 @@
               and keep it out of version control.
             </Alert.Description>
           </Alert.Root>
+        </Card.Content>
+      </Card.Root>
+    </Tabs.Content>
+
+    <Tabs.Content value="system" class="max-w-3xl space-y-3">
+      <Card.Root>
+        <Card.Header>
+          <Card.Title class="flex items-center gap-2 text-base">
+            <Server class="text-muted-foreground size-4" /> Machine
+          </Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[minmax(9rem,auto)_1fr]">
+            {#each MACHINE as [key, value] (key)}
+              <dt class="text-muted-foreground">{key}</dt>
+              <dd class="font-mono text-xs break-all">{value}</dd>
+            {/each}
+          </dl>
+        </Card.Content>
+      </Card.Root>
+
+      <Card.Root>
+        <Card.Header>
+          <Card.Title class="flex items-center gap-2 text-base">
+            <Cpu class="text-muted-foreground size-4" /> CPU &amp; toolchain
+          </Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[minmax(9rem,auto)_1fr]">
+            {#each TOOLCHAIN as [key, value] (key)}
+              <dt class="text-muted-foreground">{key}</dt>
+              <dd class="font-mono text-xs break-all">{value}</dd>
+            {/each}
+          </dl>
         </Card.Content>
       </Card.Root>
     </Tabs.Content>

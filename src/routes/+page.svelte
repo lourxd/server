@@ -52,27 +52,6 @@
     ['Swap', m ? `${bytes(m.memory.swapUsed)} of ${bytes(m.memory.swapTotal)}` : '—'],
   ]);
 
-  const MACHINE = $derived([
-    ['Hostname', data.host?.hostname],
-    ['Distribution', data.host?.distro],
-    ['Kernel', data.host?.kernel],
-    ['Architecture', data.host?.arch],
-    ['Manufacturer', data.host?.manufacturer ?? '—'],
-    ['Model', data.host?.model ?? '—'],
-    ['Virtualised', data.host?.virtual ? 'yes' : 'no'],
-    ['Uptime', m ? duration(m.uptime * 1000) : '—'],
-  ]);
-
-  const TOOLCHAIN = $derived([
-    ['Processor', data.host?.cpuModel],
-    ['Cores', `${data.host?.cpuPhysicalCores} physical / ${data.host?.cpuCores} logical`],
-    ['Base clock', `${data.host?.cpuSpeedGhz} GHz`],
-    ['Total memory', bytes(data.host?.totalMemory)],
-    ['Node.js', `v${data.host?.node}`],
-    ['npm', data.host?.npm],
-    ['git', data.host?.git ?? '—'],
-    ['docker', data.host?.docker || 'not installed'],
-  ]);
 </script>
 
 <svelte:head><title>Overview · {data.host?.hostname}</title></svelte:head>
@@ -454,28 +433,6 @@
           {/if}
         </Table.Body>
       </Table.Root>
-    </div>
-  </div>
-
-  <div class="grid gap-3 lg:grid-cols-2">
-    <div class="panel rounded-2xl p-4.5">
-      <span class="eyebrow">Machine</span>
-      <dl class="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-[minmax(7rem,auto)_1fr]">
-        {#each MACHINE as [key, value] (key)}
-          <dt class="text-muted-foreground text-[12.5px]">{key}</dt>
-          <dd class="font-mono text-[11.5px] break-all">{value}</dd>
-        {/each}
-      </dl>
-    </div>
-
-    <div class="panel rounded-2xl p-4.5">
-      <span class="eyebrow">CPU &amp; toolchain</span>
-      <dl class="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-[minmax(7rem,auto)_1fr]">
-        {#each TOOLCHAIN as [key, value] (key)}
-          <dt class="text-muted-foreground text-[12.5px]">{key}</dt>
-          <dd class="font-mono text-[11.5px] break-all">{value}</dd>
-        {/each}
-      </dl>
     </div>
   </div>
 </div>
