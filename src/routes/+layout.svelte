@@ -12,7 +12,6 @@
 
   import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
   import Boxes from '@lucide/svelte/icons/boxes';
-  import Cpu from '@lucide/svelte/icons/cpu';
   import Settings from '@lucide/svelte/icons/settings';
   import LogOut from '@lucide/svelte/icons/log-out';
   import Server from '@lucide/svelte/icons/server';
@@ -42,7 +41,6 @@
   const NAV = [
     { href: '/', label: 'Overview', icon: LayoutDashboard },
     { href: '/apps', label: 'Apps', icon: Boxes },
-    { href: '/system', label: 'System', icon: Cpu },
   ];
 
   const isActive = (href) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));

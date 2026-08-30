@@ -115,7 +115,7 @@ src/
       exec.js realtime.js sse.js cache.js
   routes/
     api/                  json + sse endpoints
-    apps/ system/ settings/ login/ setup/    the pages that exist
+    apps/ settings/ login/ setup/             the pages that exist
 ```
 
 **`server/store/` vs `server/db/` is the distinction people get wrong.**
@@ -305,9 +305,12 @@ Do not treat these as bugs to discover — they are known and deferred.
   build step before the first start, plus `min_uptime`/`max_restarts` guards.
   **This is the top outstanding item.**
 - **Light mode is undesigned** (§6).
-- **Repos / Databases / Tunnels / DNS pages were removed**, but their API routes
-  and `server/` modules remain. They are to be folded into Apps, not deleted.
-  `README.md` still documents them as pages in places.
+- **System / Repos / Databases / Tunnels / DNS pages were removed**, but their
+  API routes and `server/` modules remain. Repos/DBs/Tunnels/DNS are to be
+  folded into Apps, not deleted. System is gone for good — Overview covers it.
+- **`metrics.collectSlow()` still gathers the top 25 OS processes and process
+  counts every 10 s, and nothing consumes them** now that System is gone. Cheap,
+  but dead. Drop it, or surface the counts on Overview.
 - Deploy-wizard inner steps beyond the stack tiles are not fully restyled.
 - Connection state is no longer surfaced anywhere in the UI. `live.connected`
   still tracks it and reconnects; a dropped stream shows as stale numbers with

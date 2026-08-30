@@ -144,12 +144,11 @@ and reconnects to the daemon on its own.
   and recent lifecycle events.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail with a live log stream, config and environment.
-- **System** — Per-core load, temperatures, filesystems, interfaces, throughput
-  history, top 25 OS processes.
 - **Settings** — Projects directory, GitHub and Cloudflare tokens, password,
   users, and the audit log.
 
-Repositories, Databases, Tunnels and DNS no longer have pages of their own. Repo
+System, Repositories, Databases, Tunnels and DNS no longer have pages of their
+own. System was a second view of what Overview already shows. Repo
 import now lives inside the Apps deploy wizard; the rest are being folded into
 Apps. Their API routes and server modules are still in the tree and still work —
 see `src/routes/api/` — they simply have no UI at the moment.
@@ -258,11 +257,11 @@ src/
       ui/                  shadcn-svelte primitives (button, dialog, table, …)
       ConfirmDialog        AlertDialog-based confirmation, used by every page
       PageHeader StatCard StatusBadge TechLogo RadialGauge SparkBars
-      Sparkline DataTable LogStream
+      DataTable LogStream
     live.svelte.js         shared EventSource, toasts, HTTP transport
     stacks.js              deploy presets for the new-app wizard
     format.js              byte/duration/relative-time helpers
   routes/
     api/                   health, stream, apps, logs, repos, db, tunnels, dns, settings, auth
-    apps/ system/ settings/ login/ setup/
+    apps/ settings/ login/ setup/
 ```
