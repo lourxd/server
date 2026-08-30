@@ -21,10 +21,7 @@
 
 <svelte:head><title>Network · {data.host?.hostname}</title></svelte:head>
 
-<PageHeader
-  title="Network"
-  subtitle={m ? `${interfaces.length} interfaces · ${up} up` : 'connecting…'}
-/>
+<PageHeader title="Network" />
 
 <div class="flex flex-col gap-3.5 p-5 pt-3.5 md:p-6 md:pt-3.5">
 
