@@ -18,6 +18,8 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import Link2 from '@lucide/svelte/icons/link-2';
+  import Cloud from '@lucide/svelte/icons/cloud';
   import Play from '@lucide/svelte/icons/play';
   import Copy from '@lucide/svelte/icons/copy';
   import Check from '@lucide/svelte/icons/check';
@@ -35,6 +37,9 @@
   let copied = $state(null);
 
   let form = $state({ name: '', host: '127.0.0.1', port: '', user: '', password: '' });
+  let mode = $state('create');
+  let connUrl = $state('');
+  let connName = $state('');
 
   const engine = $derived(picked ? data.catalogue.find((e) => e.type === picked) : null);
   const engineState = $derived(
@@ -76,11 +81,30 @@
     }
   }
 
-  function openDialog() {
-    step = 1;
+  function openDialog(which = 'create') {
+    mode = which;
+    step = which === 'connect' ? 2 : 1;
     picked = null;
     creating = false;
+    connUrl = '';
+    connName = '';
     open = true;
+  }
+
+  async function connect() {
+    creating = true;
+    try {
+      const linked = await api('/api/db', {
+        action: 'connect',
+        url: connUrl.trim(),
+        name: connName.trim() || undefined,
+      });
+      toasts.ok('Database connected', `${linked.name} · ${linked.probe?.version ?? linked.type}`);
+      open = false;
+      await invalidateAll();
+    } finally {
+      creating = false;
+    }
   }
 
   function choose(type) {
@@ -131,7 +155,10 @@
 
 <PageHeader title="Databases" subtitle="{data.connections.length} on this server">
   {#snippet actions()}
-    <Button onclick={openDialog} class="accent-fill h-8.5 rounded-xl px-4 font-semibold">
+    <Button variant="ghost" size="sm" class="panel h-8.5 rounded-xl px-3" onclick={() => openDialog('connect')}>
+      <Link2 class="size-3.5" /> Connect existing
+    </Button>
+    <Button onclick={() => openDialog('create')} class="accent-fill h-8.5 rounded-xl px-4 font-semibold">
       <Plus class="size-4" /> Create database
     </Button>
   {/snippet}
@@ -146,12 +173,17 @@
       <div>
         <p class="font-semibold">No databases yet</p>
         <p class="text-muted-foreground mt-1 text-sm">
-          Create one here, then point an app at it from its Database tab.
+          Create one on this machine, or connect one you already run somewhere else.
         </p>
       </div>
-      <Button onclick={openDialog} class="accent-fill mt-1 rounded-xl px-4 font-semibold">
-        <Plus class="size-4" /> Create database
-      </Button>
+      <div class="mt-1 flex flex-wrap items-center justify-center gap-2">
+        <Button onclick={() => openDialog('create')} class="accent-fill rounded-xl px-4 font-semibold">
+          <Plus class="size-4" /> Create database
+        </Button>
+        <Button variant="outline" onclick={() => openDialog('connect')} class="rounded-xl px-4">
+          <Link2 class="size-4" /> Connect existing
+        </Button>
+      </div>
     </div>
   {:else}
     <div class="grid gap-3 xl:grid-cols-2">
@@ -169,7 +201,14 @@
                 : `${conn.host}:${conn.port}${conn.database ? ` / ${conn.database}` : ''}`}
             </p>
           </div>
-          <Badge variant="outline" class="shrink-0 font-mono text-[10.5px]">{meta?.label ?? conn.type}</Badge>
+          <div class="flex shrink-0 items-center gap-1.5">
+            {#if conn.remote}
+              <Badge variant="outline" class="border-info/40 text-info gap-1.5 font-mono text-[10.5px]">
+                <Cloud class="size-3" /> remote
+              </Badge>
+            {/if}
+            <Badge variant="outline" class="font-mono text-[10.5px]">{meta?.label ?? conn.type}</Badge>
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -259,16 +298,62 @@
   <Dialog.Content class={cn('max-h-[90vh] overflow-y-auto', step === 1 ? 'sm:max-w-2xl' : 'sm:max-w-lg')}>
     <Dialog.Header>
       <Dialog.Title>
-        {step === 1 ? 'Which database?' : `New ${engine?.label}`}
+        {#if mode === 'connect'}Connect a database
+        {:else if step === 1}Which database?
+        {:else}New {engine?.label}{/if}
       </Dialog.Title>
       <Dialog.Description>
-        {step === 1
-          ? 'Pick an engine. What is already running on this machine is marked.'
-          : engine?.summary}
+        {#if mode === 'connect'}
+          Point the panel at one you already run — managed, or on another machine.
+        {:else if step === 1}
+          Pick an engine. What is already running on this machine is marked.
+        {:else}
+          {engine?.summary}
+        {/if}
       </Dialog.Description>
     </Dialog.Header>
 
-    {#if step === 1}
+    {#if mode === 'connect'}
+      <div class="space-y-4">
+        <div class="space-y-1.5">
+          <Label for="conn-url">Connection string</Label>
+          <Input
+            id="conn-url"
+            bind:value={connUrl}
+            spellcheck="false"
+            placeholder="postgres://user:password@host.neon.tech/dbname?sslmode=require"
+            class="font-mono text-[11.5px]"
+          />
+          <p class="text-muted-foreground text-[11.5px]">
+            The URL your provider gives you. Host, port, user, password, database and TLS are read
+            from it.
+          </p>
+        </div>
+
+        <div class="space-y-1.5">
+          <Label for="conn-name">Name in the panel</Label>
+          <Input id="conn-name" bind:value={connName} placeholder="optional" />
+        </div>
+
+        <div class="panel rounded-xl p-3.5">
+          <p class="eyebrow mb-2">Understood schemes</p>
+          <div class="text-muted-foreground grid gap-1 font-mono text-[10.5px] sm:grid-cols-2">
+            <span>postgres:// · postgresql://</span>
+            <span>mysql:// · mariadb://</span>
+            <span>mongodb:// · mongodb+srv://</span>
+            <span>redis:// · rediss://</span>
+          </div>
+        </div>
+
+        <Alert.Root>
+          <CircleAlert class="size-4" />
+          <Alert.Description class="text-xs">
+            The connection is tested before it is saved, and the password is encrypted with the same
+            key as your other credentials. It is never sent back to the browser.
+          </Alert.Description>
+        </Alert.Root>
+      </div>
+    {:else if step === 1}
       <div class="grid gap-2 sm:grid-cols-2">
         {#each data.catalogue as e (e.type)}
           {@const st = stateOf(e.type)}
@@ -353,7 +438,17 @@
     {/if}
 
     <Dialog.Footer>
-      {#if step === 1}
+      {#if mode === 'connect'}
+        <Button variant="outline" disabled={creating} onclick={() => (open = false)}>Cancel</Button>
+        <Button
+          class="accent-fill rounded-xl px-4 font-semibold"
+          disabled={creating || !connUrl.trim()}
+          onclick={connect}
+        >
+          {#if creating}<LoaderCircle class="size-4 animate-spin" />{:else}<Link2 class="size-4" />{/if}
+          {creating ? 'Connecting…' : 'Test and connect'}
+        </Button>
+      {:else if step === 1}
         <Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
       {:else}
         <Button variant="outline" disabled={creating} onclick={() => (step = 1)}>

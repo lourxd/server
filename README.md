@@ -165,10 +165,12 @@ and reconnects to the daemon on its own.
   ahead/behind, uncommitted count, last commit, and which apps run from it.
   Clone from your GitHub account or any git URL, pull, fetch, install
   dependencies, or deploy one as an app. Long operations stream output live.
-- **Databases** — What exists on this server, and a Create button that leads
-  with the five engines worth running on one. SQLite needs nothing and is
-  created as a file; the others create a database inside an engine already
-  running here, and say plainly what to install when one is not.
+- **Databases** — What this panel can reach, local or remote. **Create** makes
+  a new one here: SQLite needs nothing and becomes a file; the server engines
+  need one already running, and the dialog says what to install when none is.
+  **Connect existing** takes the connection string a managed provider gives you
+  — `postgres://`, `mysql://`, `mongodb+srv://`, `rediss://` — tests it, and
+  saves it encrypted. Remote entries are marked as such in the list.
 - **Network** — Inbound/outbound rates and totals, 4-minute throughput history,
   gateway and resolvers, per-interface addressing (IPv4, MAC, link speed, MTU)
   with error and drop counters, and every listening port joined back to the app

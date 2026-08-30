@@ -119,6 +119,85 @@ async function createOnServer({ type, name, connectionName, server }) {
   return saveConnection({ ...base, name: connectionName || name, database: name });
 }
 
+const URL_SCHEMES = {
+  postgres: 'postgres',
+  postgresql: 'postgres',
+  mysql: 'mysql',
+  mariadb: 'mysql',
+  mongodb: 'mongodb',
+  'mongodb+srv': 'mongodb',
+  redis: 'redis',
+  rediss: 'redis',
+};
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '']);
+
+export function isRemote(conn) {
+  if (!conn || conn.type === 'sqlite') return false;
+  return !LOCAL_HOSTS.has(String(conn.host ?? '').trim().toLowerCase());
+}
+
+export function parseConnectionUrl(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text) throw new Error('Paste a connection string.');
+
+  let parsed;
+  try {
+    parsed = new URL(text);
+  } catch {
+    throw new Error('That is not a valid connection string.');
+  }
+
+  const scheme = parsed.protocol.replace(':', '').toLowerCase();
+  const type = URL_SCHEMES[scheme];
+  if (!type) {
+    throw new Error(`Unsupported scheme "${scheme}". Expected postgres, mysql, mongodb or redis.`);
+  }
+
+  const srv = scheme === 'mongodb+srv';
+  const database = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+  const sslParam = (parsed.searchParams.get('sslmode') ?? parsed.searchParams.get('ssl') ?? '').toLowerCase();
+
+  return {
+    type,
+    host: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : srv ? null : DRIVER_META[type].defaultPort,
+    user: decodeURIComponent(parsed.username || ''),
+    password: decodeURIComponent(parsed.password || ''),
+    database: type === 'redis' ? '' : database,
+    ssl:
+      scheme === 'rediss' ||
+      srv ||
+      ['require', 'verify-ca', 'verify-full', 'true', '1'].includes(sslParam),
+    url: srv ? text : '',
+  };
+}
+
+export async function connectDatabase(input) {
+  const fields = input.url ? parseConnectionUrl(input.url) : input;
+  const type = fields.type;
+  if (!ENGINE_BY_TYPE[type]) throw new Error(`Unsupported database type: ${type}`);
+
+  const conn = {
+    type,
+    host: fields.host || '127.0.0.1',
+    port: Number(fields.port) || DRIVER_META[type].defaultPort,
+    user: fields.user ?? '',
+    password: fields.password ?? '',
+    database: fields.database ?? '',
+    ssl: !!fields.ssl,
+    url: fields.url || '',
+  };
+
+  const result = await probe(conn).catch((err) => {
+    throw new Error(`Could not connect: ${err.message}`);
+  });
+  if (result && result.ok === false) throw new Error(result.error || 'The server refused the connection.');
+
+  const name = String(input.name ?? '').trim() || conn.database || conn.host;
+  return { ...(await saveConnection({ ...conn, name })), probe: result };
+}
+
 export async function createDatabase(input) {
   const engine = ENGINE_BY_TYPE[input.type];
   if (!engine) throw new Error(`Unsupported database type: ${input.type}`);
