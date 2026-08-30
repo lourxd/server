@@ -174,7 +174,10 @@ and reconnects to the daemon on its own.
 - **Network** — Inbound/outbound rates and totals, 4-minute throughput history,
   gateway and resolvers, per-interface addressing (IPv4, MAC, link speed, MTU)
   with error and drop counters, and every listening port joined back to the app
-  that owns it.
+  that owns it. Two more tabs: **Tunnels** publishes an app to the internet
+  through Cloudflare with no inbound port open — named tunnels on your own
+  hostnames, or throwaway `trycloudflare.com` ones — and **DNS** manages records
+  per zone with a Check that resolves against 1.1.1.1 and 8.8.8.8.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail in tabs — Overview, Environment, Database, Logs — with a live log
   stream. The Database tab attaches any saved connection, local or remote:
@@ -200,7 +203,7 @@ Create a token at **Cloudflare → My Profile → API Tokens** with:
 - `Zone → DNS → Edit`
 - `Zone → Zone → Read`
 
-Then install `cloudflared` (downloads the static binary
+Then install `cloudflared` from the Tunnels tab (it downloads the static binary
 into `~/.local/bin`, no sudo). Creating a route writes a proxied CNAME to
 `<tunnel-id>.cfargotunnel.com` and pushes the ingress rule to Cloudflare; the
 record is removed again when you delete the route.

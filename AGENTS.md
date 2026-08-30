@@ -424,9 +424,9 @@ Do not treat these as bugs to discover — they are known and deferred.
   split across Overview (compute, storage, processes), Network (interfaces and
   throughput) and Settings' System tab (the static machine/toolchain readout).
   Overview is a long scrolling page now, not a viewport-height dashboard.
-- **Network is where ingress belongs.** When Tunnels and DNS come back, they go
-  on this page, not on pages of their own — a route and the interface it exits
-  through are the same question.
+- **Tunnels and DNS live as tabs on Network**, not as pages of their own — a
+  route and the interface it exits through are the same question. The backend
+  (`server/cloudflare/`) was always intact; only the UI had been removed.
 - Deploy-wizard inner steps beyond the stack tiles are not fully restyled.
 - Connection state is no longer surfaced anywhere in the UI. `live.connected`
   still tracks it and reconnects; a dropped stream shows as stale numbers with
