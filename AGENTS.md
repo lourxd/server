@@ -307,10 +307,9 @@ Do not treat these as bugs to discover — they are known and deferred.
 - **Light mode is undesigned** (§6).
 - **System / Repos / Databases / Tunnels / DNS pages were removed**, but their
   API routes and `server/` modules remain. Repos/DBs/Tunnels/DNS are to be
-  folded into Apps, not deleted. System is gone for good — Overview covers it.
-- **`metrics.collectSlow()` still gathers the top 25 OS processes and process
-  counts every 10 s, and nothing consumes them** now that System is gone. Cheap,
-  but dead. Drop it, or surface the counts on Overview.
+  folded into Apps, not deleted. System is gone for good — Overview absorbed
+  every panel it had, so Overview is now a long scrolling page rather than a
+  viewport-height dashboard.
 - Deploy-wizard inner steps beyond the stack tiles are not fully restyled.
 - Connection state is no longer surfaced anywhere in the UI. `live.connected`
   still tracks it and reconnects; a dropped stream shows as stale numbers with

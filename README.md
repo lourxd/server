@@ -140,15 +140,18 @@ and reconnects to the daemon on its own.
 
 ## Pages
 
-- **Overview** — CPU, memory, disk, network with 4-minute sparklines; app roll-up
-  and recent lifecycle events.
+- **Overview** — Everything about the machine on one scrolling page: CPU,
+  memory, disk and network vitals; app roll-up and recent lifecycle events;
+  per-core load and temperatures; 4-minute history for processor, memory,
+  network and disk I/O; all filesystems; network interfaces; the top 25 OS
+  processes; and the hardware/toolchain readout.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail with a live log stream, config and environment.
 - **Settings** — Projects directory, GitHub and Cloudflare tokens, password,
   users, and the audit log.
 
 System, Repositories, Databases, Tunnels and DNS no longer have pages of their
-own. System was a second view of what Overview already shows. Repo
+own. System's panels all moved onto Overview. Repo
 import now lives inside the Apps deploy wizard; the rest are being folded into
 Apps. Their API routes and server modules are still in the tree and still work —
 see `src/routes/api/` — they simply have no UI at the moment.
