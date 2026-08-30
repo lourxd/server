@@ -305,6 +305,23 @@ has already succeeded (git lives in /usr/bin). `exec.js` prepends
 toolchain that runs the panel regardless of how it was launched; the unit sets
 `PATH` too.
 
+**An app inherits the environment of whoever started the PM2 daemon, and of the
+client that started the app.** Both leak. When the panel spawned the daemon, the
+daemon carried the panel's `HOST`, `PORT=8088`, `NODE_ENV` and `PM2D_*`, and
+every app inherited them — an app that did not set `PORT` would have picked up
+the panel's. `pm2 save` then bakes the leak into `dump.pm2`, so `resurrect`
+restores it even after the daemon is clean. Two conditions keep it clean:
+`pm2.service` owns the daemon with only `PM2_HOME` and `PATH` set, and the panel
+passes an explicit `env`. Starting an app with the `pm2` CLI from a normal shell
+reintroduces it — the CLI ships its own `process.env` with the app config.
+
+**Set only what an app cannot run without, and make it visible.** Presets fill
+`PORT` (protective: without it the app inherits the daemon's) and
+`NODE_ENV=production`. `HOST` belongs only to stacks whose server binds
+localhost by default — Astro's node adapter — not as a blanket default.
+Everything a preset sets shows up in the environment editor, where it can be
+removed.
+
 **PM2's process env is mostly the machine's, not the app's.** It carries
 whatever the daemon inherited — `SSH_AUTH_SOCK`, `GPG_AGENT_INFO`,
 `MANAGERPIDFDID`, XDG and systemd keys — so a denylist never keeps up. On start
