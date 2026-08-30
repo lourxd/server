@@ -93,6 +93,9 @@
   let building = $state(false);
   let buildFailed = $state(false);
   let advanced = $state(false);
+  let portState = $state(null);
+  let portChecking = $state(false);
+  let portTimer = null;
   let buildLines = $state([]);
 
   let importing = $state(false);
@@ -255,6 +258,7 @@
     const repo = data.repos.find((r) => r.relPath === relPath);
     imported = { relPath, pkg: repo?.pkg ?? null };
     applyStackDefaults(relPath, imported.pkg);
+    queuePortCheck(isStatic ? form.servePort : form.envVars.find((v) => v.key === 'PORT')?.value);
     toasts.ok('Repository imported', relPath);
     step = 3;
   }
@@ -264,10 +268,41 @@
     const repo = data.repos.find((r) => r.relPath === localRepo);
     imported = { relPath: localRepo, pkg: repo?.pkg ?? null };
     applyStackDefaults(localRepo, imported.pkg);
+    queuePortCheck(isStatic ? form.servePort : form.envVars.find((v) => v.key === 'PORT')?.value);
     step = 3;
   }
 
   const selectedRepo = $derived(data.repos.find((r) => r.relPath === form.cwd));
+  const portVar = $derived(form.envVars.find((v) => v.key === 'PORT') ?? null);
+  const activePort = $derived(isStatic ? form.servePort : (portVar?.value ?? ''));
+
+  function setPort(value) {
+    if (isStatic) {
+      form.servePort = value;
+    } else if (portVar) {
+      form.envVars = form.envVars.map((v) => (v.key === 'PORT' ? { ...v, value } : v));
+    } else {
+      form.envVars = [...form.envVars, { key: 'PORT', value, secret: false }];
+    }
+    queuePortCheck(value);
+  }
+
+  function queuePortCheck(value) {
+    clearTimeout(portTimer);
+    portState = null;
+    if (!value) return;
+    portChecking = true;
+    portTimer = setTimeout(async () => {
+      try {
+        portState = await apiGet('/api/ports', { port: value }, { quiet: true });
+      } catch {
+        portState = null;
+      } finally {
+        portChecking = false;
+      }
+    }, 400);
+  }
+
   const commandPreview = $derived.by(() => {
     if (isStatic) return `serve ${form.serveDir || 'dist'} on port ${form.servePort}`;
     const parts = [form.interpreter || 'node', form.script || '<file>', form.args].filter(Boolean);
@@ -805,19 +840,54 @@
           </div>
 
           {#if isStatic}
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div class="space-y-1.5">
-                <Label for="serve-dir">Folder to serve</Label>
-                <Input id="serve-dir" bind:value={form.serveDir} class="font-mono text-xs" />
-                <p class="text-muted-foreground text-[11.5px]">
-                  Produced by <code class="font-mono">{buildCmd}</code>.
-                </p>
-              </div>
-              <div class="space-y-1.5">
-                <Label for="serve-port">Port</Label>
-                <Input id="serve-port" type="number" bind:value={form.servePort} />
-                <p class="text-muted-foreground text-[11.5px]">Where the site is served.</p>
-              </div>
+          <div class="space-y-1.5">
+            <Label for="app-port">Port</Label>
+            <div class="flex items-center gap-2">
+              <Input
+                id="app-port"
+                type="number"
+                min="1"
+                max="65535"
+                value={activePort}
+                oninput={(e) => setPort(e.currentTarget.value)}
+                class="max-w-40"
+              />
+              {#if portChecking}
+                <span class="text-muted-foreground flex items-center gap-1.5 text-[11.5px]">
+                  <LoaderCircle class="size-3.5 animate-spin" /> checking
+                </span>
+              {:else if portState?.free}
+                <span class="text-ok flex items-center gap-1.5 text-[11.5px]">
+                  <span class="dot"></span> available
+                </span>
+              {:else if portState && !portState.free}
+                <span class="text-bad flex items-center gap-1.5 text-[11.5px]">
+                  <span class="dot"></span> in use
+                </span>
+              {/if}
+            </div>
+            {#if portState && !portState.free}
+              <p class="text-bad text-[11.5px]">
+                {portState.reason}
+                {#if portState.holder?.app}
+                  <a href="/apps/{portState.holder.app.pmId}" class="underline">
+                    Open {portState.holder.app.name}
+                  </a>
+                {/if}
+              </p>
+            {:else}
+              <p class="text-muted-foreground text-[11.5px]">
+                Checked against everything listening on this machine before deploying.
+              </p>
+            {/if}
+          </div>
+
+            <div class="space-y-1.5">
+              <Label for="serve-dir">Folder to serve</Label>
+              <Input id="serve-dir" bind:value={form.serveDir} class="font-mono text-xs" />
+              <p class="text-muted-foreground text-[11.5px]">
+                Produced by <code class="font-mono">{buildCmd}</code>.
+              </p>
             </div>
             <div class="flex items-start gap-2.5">
               <Checkbox id="spa" bind:checked={form.serveSpa} />
@@ -838,6 +908,48 @@
                 {/if}
               </p>
             </div>
+
+          <div class="space-y-1.5">
+            <Label for="app-port">Port</Label>
+            <div class="flex items-center gap-2">
+              <Input
+                id="app-port"
+                type="number"
+                min="1"
+                max="65535"
+                value={activePort}
+                oninput={(e) => setPort(e.currentTarget.value)}
+                class="max-w-40"
+              />
+              {#if portChecking}
+                <span class="text-muted-foreground flex items-center gap-1.5 text-[11.5px]">
+                  <LoaderCircle class="size-3.5 animate-spin" /> checking
+                </span>
+              {:else if portState?.free}
+                <span class="text-ok flex items-center gap-1.5 text-[11.5px]">
+                  <span class="dot"></span> available
+                </span>
+              {:else if portState && !portState.free}
+                <span class="text-bad flex items-center gap-1.5 text-[11.5px]">
+                  <span class="dot"></span> in use
+                </span>
+              {/if}
+            </div>
+            {#if portState && !portState.free}
+              <p class="text-bad text-[11.5px]">
+                {portState.reason}
+                {#if portState.holder?.app}
+                  <a href="/apps/{portState.holder.app.pmId}" class="underline">
+                    Open {portState.holder.app.name}
+                  </a>
+                {/if}
+              </p>
+            {:else}
+              <p class="text-muted-foreground text-[11.5px]">
+                Checked against everything listening on this machine before deploying.
+              </p>
+            {/if}
+          </div>
 
             <div class="space-y-1.5">
               <Label for="args">Arguments</Label>
@@ -961,7 +1073,10 @@
         </Button>
         <Button
           class="accent-fill rounded-xl px-4 font-semibold"
-          disabled={building || (isStatic ? !form.serveDir : !form.script)}
+          disabled={building ||
+            portChecking ||
+            (portState && !portState.free) ||
+            (isStatic ? !form.serveDir : !form.script)}
           onclick={deploy}
         >
           {#if building}

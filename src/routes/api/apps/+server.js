@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import * as pm2 from '$srv/pm2.js';
 import { safeRepoPath } from '$srv/repos.js';
 import { STACK_BY_ID } from '$lib/stacks.js';
+import { checkPort } from '$srv/ports.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -66,6 +67,13 @@ export async function POST({ request }) {
   }
 }
 
+async function assertPortFree(port, { force = false } = {}) {
+  if (force || port == null || port === '') return;
+  const result = await checkPort(port);
+  if (result.free || !result.valid) return;
+  error(409, `${result.reason} Choose another port, or stop what is holding it.`);
+}
+
 async function startProcess(body) {
   const cwd = safeRepoPath(body.cwd || '');
 
@@ -85,6 +93,7 @@ async function startProcess(body) {
   if (!/^[A-Za-z0-9._@/-]+$/.test(name)) error(400, 'Invalid app name.');
 
   if (body.serve) {
+    await assertPortFree(body.serve.port, { force: body.forcePort });
     const dir = path.resolve(cwd, String(body.serve.dir || 'dist'));
     if (!dir.startsWith(path.resolve(cwd))) error(400, 'Serve directory escapes the project directory.');
     if (!fs.existsSync(dir)) error(400, `Build output not found at ${dir}. Run the build first.`);
@@ -117,6 +126,8 @@ async function startProcess(body) {
       `No build output at ${path.join(cwd, buildOutput)}. Run the build step before starting, or the process will exit immediately and restart until PM2 gives up.`,
     );
   }
+
+  await assertPortFree(env.PORT, { force: body.forcePort });
 
   const script = String(body.script || '').trim();
   if (!script) error(400, 'A script or ecosystem file is required.');

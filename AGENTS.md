@@ -290,6 +290,13 @@ internally. Grep the whole tree, `ui/` included.
 was called by `realtime.js` but not exported from `pm2.js`; the build succeeded
 and shutdown would have thrown.
 
+**Probe a port by binding it, not by reading the listener list.** A bind test
+catches processes owned by other users, which `networkConnections()` reports
+without a PID. Test hosts **sequentially** — binding `0.0.0.0` and `127.0.0.1`
+in parallel makes the second collide with the first and reports every free port
+as taken. `ports.js` does this and names the holder by matching its PID against
+the PM2 list.
+
 **A systemd unit's PATH has no nvm directory.** The unit starts the panel with
 an absolute path to node, so the panel itself runs — but every spawned `npm`,
 `npx`, `pnpm` or `yarn` fails with `spawn npm ENOENT`, and only after a clone

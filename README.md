@@ -165,7 +165,8 @@ and reconnects to the daemon on its own.
   with error and drop counters, and every listening port joined back to the app
   that owns it.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
-  detail with a live log stream, config and environment.
+  detail with a live log stream, config and environment. The deploy wizard
+  checks the port is actually free before starting, and names whatever holds it.
 - **Settings** — Projects directory, storage paths, the machine and
   CPU/toolchain readout, GitHub and Cloudflare tokens, password, users, and the
   audit log.
