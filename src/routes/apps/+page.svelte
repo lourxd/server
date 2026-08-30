@@ -156,7 +156,6 @@
   }
 
   function onSourceChange(value) {
-    source = value;
     if (value === 'github' && data.github.connected && !ghRepos.length) loadGithub();
   }
 

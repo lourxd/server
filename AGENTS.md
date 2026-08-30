@@ -307,8 +307,14 @@ or `lo` traffic inflates them.
 The panel does not run as root, so system daemons come back with `pid: null` and
 an empty process name. The UI says "another user" rather than pretending.
 
-**shadcn's dark active-tab style is invisible in this palette**
-(`bg-input/30` over `bg-muted`). `tabs-trigger.svelte` overrides it.
+**bits-ui renders `data-state="active"`, not `data-active`.** The vendored
+shadcn `tabs-trigger.svelte` styled the active tab with `data-active:` variants,
+which Tailwind compiles to `[data-active]` — an attribute bits-ui never sets. It
+generated valid CSS that matched nothing, so no tab ever looked selected on any
+page, and the earlier "fix" for the Settings tabs changed colours on a selector
+that could not match. Use `data-[state=active]:`. When a shadcn component's
+state styling silently does nothing, check the attribute the primitive actually
+emits before touching the colours.
 
 ---
 
