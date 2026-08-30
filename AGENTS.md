@@ -290,6 +290,14 @@ internally. Grep the whole tree, `ui/` included.
 was called by `realtime.js` but not exported from `pm2.js`; the build succeeded
 and shutdown would have thrown.
 
+**Never put a secret in PM2's environment.** `pm2 save` serialises every
+process's env into `~/.pm2/dump.pm2`, which PM2 creates **0664** inside a **0775**
+directory — world-readable to every local account. Secrets go into a `.env` file
+written 0600 in the project directory, and the panel adds `.env` to that repo's
+`.gitignore`. Node entry points get `--env-file-if-exists=.env` as an interpreter
+arg; the frameworks (Next, Vite, Astro, Nuxt) read `.env` themselves. Only
+non-secret config is handed to PM2.
+
 **systemd's default `KillMode=control-group` killed every deployed app.** The
 panel called `pm2.connect()`, which spawns a PM2 daemon when none exists — as a
 child of the panel, so inside the panel's cgroup. Every `systemctl restart

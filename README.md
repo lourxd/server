@@ -214,6 +214,11 @@ services to the internet. Treat access to it as equivalent to a shell.
   *beside* the database rather than inside it, so a copied `panel.db` is not
   enough on its own. Tokens are never sent to the browser after saving, and are
   redacted from streamed command output.
+- **Application secrets never reach PM2.** `pm2 save` writes every process's
+  environment to `~/.pm2/dump.pm2`, which is world-readable (0664 in a 0775
+  directory). Variables marked secret in the deploy wizard are written to a
+  `.env` file in the project at mode 0600, added to that repo's `.gitignore`,
+  and loaded by the app rather than injected by the process manager.
 - Consequential actions are recorded in `audit_log` with user, target and IP.
 - Responses carry `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
   `Referrer-Policy: same-origin`.

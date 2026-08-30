@@ -75,7 +75,10 @@ async function startProcess(body) {
     return pm2.startFromFile(file);
   }
 
-  const env = parseEnv(body.env) ?? {};
+  const split = splitEnv(body.envVars);
+  const env = Array.isArray(body.envVars) ? split.plain : (parseEnv(body.env) ?? {});
+  const secrets = split.secret;
+  if (Object.keys(secrets).length) writeEnvFile(cwd, secrets);
   if (body.stack && /^[a-z0-9-]{1,32}$/.test(body.stack)) env.SCP_STACK = body.stack;
 
   const name = String(body.name || path.basename(cwd)).trim();
@@ -124,6 +127,7 @@ async function startProcess(body) {
 
   const interpreter = body.interpreter || undefined;
   const nodeEntry = !interpreter || interpreter === 'node';
+  const hasEnvFile = fs.existsSync(path.join(cwd, '.env'));
   const execMode = body.execMode === 'cluster' && nodeEntry ? 'cluster' : 'fork';
   if (body.execMode === 'cluster' && !nodeEntry) {
     console.warn(`[apps] cluster requested for a ${interpreter} entry point; falling back to fork`);
@@ -143,6 +147,7 @@ async function startProcess(body) {
     max_restarts: 10,
     restart_delay: 1000,
     interpreter,
+    interpreter_args: nodeEntry && hasEnvFile ? ['--env-file-if-exists=.env'] : undefined,
     env: Object.keys(env).length ? env : undefined,
     time: true,
   };
@@ -153,6 +158,42 @@ function parseArgs(input) {
   if (!input) return [];
   if (Array.isArray(input)) return input.map(String);
   return String(input).match(/"[^"]*"|'[^']*'|\S+/g)?.map((s) => s.replace(/^["']|["']$/g, '')) ?? [];
+}
+
+const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function splitEnv(input) {
+  const plain = {};
+  const secret = {};
+  if (!Array.isArray(input)) return { plain, secret };
+  for (const row of input) {
+    const key = String(row?.key ?? '').trim();
+    if (!key) continue;
+    if (!ENV_KEY_RE.test(key)) error(400, `Invalid environment variable name: ${key}`);
+    (row.secret ? secret : plain)[key] = String(row.value ?? '');
+  }
+  return { plain, secret };
+}
+
+function envFileBody(vars) {
+  return (
+    Object.entries(vars)
+      .map(([k, v]) => (/[\s"'#$`\\]/.test(v) ? `${k}="${v.replace(/(["\\$`])/g, '\\$1')}"` : `${k}=${v}`))
+      .join('\n') + '\n'
+  );
+}
+
+function writeEnvFile(cwd, vars) {
+  const file = path.join(cwd, '.env');
+  fs.writeFileSync(file, envFileBody(vars), { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
+
+  const ignore = path.join(cwd, '.gitignore');
+  const current = fs.existsSync(ignore) ? fs.readFileSync(ignore, 'utf8') : '';
+  if (!current.split('\n').some((l) => l.trim() === '.env')) {
+    fs.appendFileSync(ignore, `${current && !current.endsWith('\n') ? '\n' : ''}.env\n`);
+  }
+  return file;
 }
 
 function parseEnv(input) {

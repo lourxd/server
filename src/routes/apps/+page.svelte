@@ -16,7 +16,6 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
-  import { Textarea } from '$lib/components/ui/textarea/index.js';
   import { Checkbox } from '$lib/components/ui/checkbox/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
 
@@ -26,6 +25,7 @@
   import TechLogo from '$lib/components/TechLogo.svelte';
   import SparkBars from '$lib/components/SparkBars.svelte';
   import LogStream from '$lib/components/LogStream.svelte';
+  import EnvEditor from '$lib/components/EnvEditor.svelte';
 
   import Plus from '@lucide/svelte/icons/plus';
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
@@ -108,6 +108,7 @@
     autorestart: true,
     maxMemory: '',
     env: '',
+    envVars: [],
     interpreter: '',
     serveDir: '',
     servePort: 5000,
@@ -186,7 +187,16 @@
       args: d.args ?? '',
       execMode: d.execMode ?? 'fork',
       instances: d.execMode === 'cluster' ? 2 : 1,
-      env: [d.env, d.port && !stack.serve ? `PORT=${d.port}` : ''].filter(Boolean).join('\n'),
+      envVars: [
+        ...(d.env ?? '')
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => {
+            const eq = line.indexOf('=');
+            return { key: line.slice(0, eq), value: line.slice(eq + 1), secret: false };
+          }),
+        ...(d.port && !stack.serve ? [{ key: 'PORT', value: String(d.port), secret: false }] : []),
+      ],
       interpreter: d.interpreter ?? '',
       serveDir: stack.serve?.dir ?? '',
       servePort: d.port ?? 5000,
@@ -505,7 +515,9 @@
 </div>
 
 <Dialog.Root bind:open={wizardOpen}>
-  <Dialog.Content class={cn('max-h-[88vh] overflow-y-auto', step === 1 ? 'sm:max-w-2xl' : 'sm:max-w-xl')}>
+  <Dialog.Content
+    class={cn('max-h-[90vh] overflow-y-auto', step === 1 ? 'sm:max-w-4xl' : 'sm:max-w-3xl')}
+  >
     <Dialog.Header>
       <Dialog.Title>
         {#if step === 1}What are you deploying?
@@ -873,8 +885,7 @@
         {/if}
 
         <div class="space-y-2">
-          <Label for="env">Environment</Label>
-          <Textarea id="env" rows={4} bind:value={form.env} class="font-mono text-xs" />
+          <EnvEditor bind:vars={form.envVars} />
           <p class="text-muted-foreground text-xs">One KEY=value per line.</p>
         </div>
 
