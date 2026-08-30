@@ -338,6 +338,13 @@ options from `describe`, deletes, and starts again through the hardened
 `startProcess` path, rolling back to the previous env if the new start fails.
 The pm_id changes, so the client follows the redirect.
 
+**Never write an SVG path from memory.** The five database marks added to
+`TechLogo.svelte` were invented and looked wrong on screen — PostgreSQL's real
+path is 5091 characters, the fabricated one was 1243. The thirteen original
+marks were sourced properly and verified correct. To add one: `npm i
+simple-icons` in a scratch directory, read `si<Name>.path`, paste it, verify the
+string matches, and delete the scratch install.
+
 **Never put a secret in PM2's environment.** `pm2 save` serialises every
 process's env into `~/.pm2/dump.pm2`, which PM2 creates **0664** inside a **0775**
 directory — world-readable to every local account. Secrets go into a `.env` file

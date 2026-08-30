@@ -18,6 +18,9 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import Play from '@lucide/svelte/icons/play';
+  import Copy from '@lucide/svelte/icons/copy';
+  import Check from '@lucide/svelte/icons/check';
   import CircleAlert from '@lucide/svelte/icons/circle-alert';
 
   let { data } = $props();
@@ -28,6 +31,8 @@
   let creating = $state(false);
   let confirmOpen = $state(false);
   let removeTarget = $state(null);
+  let busy = $state(null);
+  let copied = $state(null);
 
   let form = $state({ name: '', host: '127.0.0.1', port: '', user: '', password: '' });
 
@@ -38,6 +43,38 @@
   const running = $derived(engineState?.listening === true);
 
   const stateOf = (type) => data.engines.find((e) => e.type === type && e.installed) ?? null;
+
+  function statusOf(e, st) {
+    if (!e.needsServer) return { key: 'ready', label: 'built in', tone: 'var(--ok)' };
+    if (st?.listening) return { key: 'ready', label: `listening on ${e.defaultPort}`, tone: 'var(--ok)' };
+    if (st?.installed) return { key: 'stopped', label: 'installed, not running', tone: 'var(--warn)' };
+    return { key: 'missing', label: 'not installed', tone: 'var(--muted-foreground)' };
+  }
+
+  const readyCount = $derived(
+    data.catalogue.filter((e) => statusOf(e, stateOf(e.type)).key === 'ready').length,
+  );
+
+  async function startEngine(e, st) {
+    busy = e.type;
+    try {
+      await api('/api/db', { action: 'service', service: st.service, serviceAction: 'start' });
+      toasts.ok(`${e.label} started`);
+      await invalidateAll();
+    } finally {
+      busy = null;
+    }
+  }
+
+  async function copyInstall(e) {
+    try {
+      await navigator.clipboard.writeText(e.install);
+      copied = e.type;
+      setTimeout(() => (copied = null), 1600);
+    } catch {
+      toasts.info('Install with', e.install);
+    }
+  }
 
   function openDialog() {
     step = 1;
@@ -146,25 +183,72 @@
     </div>
   {/if}
 
-  <div class="panel rounded-2xl p-4.5">
-    <span class="eyebrow">Engines on this machine</span>
-    <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+  <div class="space-y-3">
+    <div class="flex items-baseline gap-2">
+      <span class="eyebrow">Engines</span>
+      <span class="text-muted-foreground ml-auto font-mono text-[10.5px]">
+        {readyCount} of {data.catalogue.length} ready
+      </span>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {#each data.catalogue as e (e.type)}
         {@const st = stateOf(e.type)}
-        <div class="flex items-center gap-2.5">
-          <TechLogo name={e.logo} class="text-foreground/70 size-4" />
-          <span class="text-[12.5px]">{e.label}</span>
-          <span class="ml-auto font-mono text-[10.5px]">
-            {#if !e.needsServer}
-              <span class="text-ok">built in</span>
-            {:else if st?.listening}
-              <span class="text-ok">running</span>
-            {:else if st?.installed}
-              <span class="text-warn">stopped</span>
-            {:else}
-              <span class="text-muted-foreground">not installed</span>
-            {/if}
-          </span>
+        {@const status = statusOf(e, st)}
+        <div
+          class={cn(
+            'flex items-center gap-3.5 rounded-2xl p-4',
+            status.key === 'ready' ? 'panel-raised' : 'panel',
+          )}
+        >
+          <div
+            class={cn(
+              'grid size-10 shrink-0 place-items-center rounded-xl',
+              status.key === 'ready' ? 'bg-foreground/8 text-foreground' : 'bg-foreground/4 text-foreground/40',
+            )}
+          >
+            <TechLogo name={e.logo} class="size-5" />
+          </div>
+
+          <div class="min-w-0 flex-1">
+            <p class={cn('truncate text-[13.5px] font-semibold', status.key !== 'ready' && 'text-foreground/70')}>
+              {e.label}
+            </p>
+            <p class="mt-0.5 flex items-center gap-1.5 font-mono text-[10.5px]" style="color:{status.tone}">
+              {#if status.key !== 'missing'}<span class="dot"></span>{/if}
+              {status.label}
+            </p>
+          </div>
+
+          {#if status.key === 'stopped'}
+            <Button
+              variant="ghost"
+              size="sm"
+              class="panel h-7.5 shrink-0 rounded-lg px-2.5 text-[11.5px]"
+              disabled={busy === e.type}
+              onclick={() => startEngine(e, st)}
+            >
+              {#if busy === e.type}
+                <LoaderCircle class="size-3.5 animate-spin" />
+              {:else}
+                <Play class="size-3.5" />
+              {/if}
+              Start
+            </Button>
+          {:else if status.key === 'missing'}
+            <button
+              type="button"
+              title="Copy install command"
+              onclick={() => copyInstall(e)}
+              class="panel text-muted-foreground hover:text-foreground flex h-7.5 shrink-0 items-center gap-1.5 rounded-lg px-2.5 font-mono text-[10.5px] transition-colors"
+            >
+              {#if copied === e.type}
+                <Check class="size-3.5" /> copied
+              {:else}
+                <Copy class="size-3.5" /> apt
+              {/if}
+            </button>
+          {/if}
         </div>
       {/each}
     </div>
