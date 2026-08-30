@@ -3,7 +3,9 @@
   import { bytes, duration, num, relTime } from '$lib/format.js';
   import { cn } from '$lib/utils.js';
   import { STACKS, STACK_BY_ID, detectStack } from '$lib/stacks.js';
-  import { invalidateAll } from '$app/navigation';
+  import { onMount } from 'svelte';
+  import { invalidateAll, replaceState } from '$app/navigation';
+  import { page } from '$app/state';
 
   import * as Card from '$lib/components/ui/card/index.js';
   import * as Table from '$lib/components/ui/table/index.js';
@@ -119,6 +121,17 @@
     ghFilter ? ghRepos.filter((r) => r.fullName.toLowerCase().includes(ghFilter.toLowerCase())) : ghRepos,
   );
 
+  onMount(() => {
+    const rel = page.url.searchParams.get('deploy');
+    if (!rel || !data.repos.some((r) => r.relPath === rel)) return;
+    openWizard();
+    source = 'local';
+    localRepo = rel;
+    const url = new URL(page.url);
+    url.searchParams.delete('deploy');
+    replaceState(url, {});
+  });
+
   function openWizard() {
     step = 1;
     stackId = null;
@@ -134,6 +147,10 @@
 
   function chooseStack(id) {
     stackId = id;
+    if (localRepo) {
+      useLocal();
+      return;
+    }
     step = 2;
     if (source === 'github' && data.github.connected && !ghRepos.length) loadGithub();
   }

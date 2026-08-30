@@ -144,6 +144,10 @@ and reconnects to the daemon on its own.
   memory, disk and network vitals; app roll-up and recent lifecycle events;
   per-core load and temperatures; 4-minute history for processor, memory and
   disk I/O; all filesystems; and the top 25 OS processes.
+- **Repositories** — Everything cloned into the projects directory: branch,
+  ahead/behind, uncommitted count, last commit, and which apps run from it.
+  Clone from your GitHub account or any git URL, pull, fetch, install
+  dependencies, or deploy one as an app. Long operations stream output live.
 - **Network** — Inbound/outbound rates and totals, 4-minute throughput history,
   gateway and resolvers, per-interface addressing (IPv4, MAC, link speed, MTU)
   with error and drop counters, and every listening port joined back to the app
@@ -270,5 +274,5 @@ src/
     format.js              byte/duration/relative-time helpers
   routes/
     api/                   health, stream, apps, logs, repos, db, tunnels, dns, settings, auth
-    apps/ network/ settings/ login/ setup/
+    apps/ repos/ network/ settings/ login/ setup/
 ```

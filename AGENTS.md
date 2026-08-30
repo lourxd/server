@@ -115,7 +115,7 @@ src/
       exec.js realtime.js sse.js cache.js
   routes/
     api/                  json + sse endpoints
-    apps/ network/ settings/ login/ setup/    the pages that exist
+    apps/ repos/ network/ settings/ login/ setup/   the pages that exist
 ```
 
 **`server/store/` vs `server/db/` is the distinction people get wrong.**
@@ -290,6 +290,14 @@ internally. Grep the whole tree, `ui/` included.
 was called by `realtime.js` but not exported from `pm2.js`; the build succeeded
 and shutdown would have thrown.
 
+**Rebuilding in place kills the running panel.** `adapter-node` serves static
+assets through sirv, which caches the file manifest at boot; `npm run build`
+replaces those hashed files underneath it, and the next request for an old chunk
+makes a ReadStream emit an unhandled `ENOENT` that takes the process down. It is
+fatal, not a 404. systemd restarts it, so it self-heals, but in-flight requests
+die — and `install.sh` builds in the install directory, so an upgrade does this
+to a live panel. Build elsewhere and swap, or expect the bounce.
+
 **`si.networkStats()` with no argument returns only the default interface.**
 Pass `'*'` for all of them. The interfaces table silently showed exactly one row
 until this was found. Filter loopback (`/^lo\d*$/`) out of the aggregate totals
@@ -316,7 +324,7 @@ Do not treat these as bugs to discover — they are known and deferred.
 - **Light mode is undesigned** (§6).
 - **System / Repos / Databases / Tunnels / DNS pages were removed**, but their
   API routes and `server/` modules remain. Repos/DBs/Tunnels/DNS are to be
-  folded into Apps, not deleted. System is gone for good — its panels were
+  folded into Apps, not deleted. Repositories is back as its own page. System is gone for good — its panels were
   split across Overview (compute, storage, processes), Network (interfaces and
   throughput) and Settings' System tab (the static machine/toolchain readout).
   Overview is a long scrolling page now, not a viewport-height dashboard.

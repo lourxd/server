@@ -13,6 +13,7 @@
   import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
   import Boxes from '@lucide/svelte/icons/boxes';
   import Network from '@lucide/svelte/icons/network';
+  import GitFork from '@lucide/svelte/icons/git-fork';
   import Settings from '@lucide/svelte/icons/settings';
   import LogOut from '@lucide/svelte/icons/log-out';
   import Server from '@lucide/svelte/icons/server';
@@ -42,6 +43,7 @@
   const NAV = [
     { href: '/', label: 'Overview', icon: LayoutDashboard },
     { href: '/apps', label: 'Apps', icon: Boxes },
+    { href: '/repos', label: 'Repositories', icon: GitFork },
     { href: '/network', label: 'Network', icon: Network },
   ];
 
