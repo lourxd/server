@@ -165,6 +165,10 @@ and reconnects to the daemon on its own.
   ahead/behind, uncommitted count, last commit, and which apps run from it.
   Clone from your GitHub account or any git URL, pull, fetch, install
   dependencies, or deploy one as an app. Long operations stream output live.
+- **Databases** — What exists on this server, and a Create button that leads
+  with the five engines worth running on one. SQLite needs nothing and is
+  created as a file; the others create a database inside an engine already
+  running here, and say plainly what to install when one is not.
 - **Network** — Inbound/outbound rates and totals, 4-minute throughput history,
   gateway and resolvers, per-interface addressing (IPv4, MAC, link speed, MTU)
   with error and drop counters, and every listening port joined back to the app
@@ -299,5 +303,5 @@ src/
     format.js              byte/duration/relative-time helpers
   routes/
     api/                   health, stream, apps, logs, repos, db, tunnels, dns, settings, auth
-    apps/ repos/ network/ settings/ login/ setup/
+    apps/ repos/ databases/ network/ settings/ login/ setup/
 ```

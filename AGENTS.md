@@ -115,7 +115,7 @@ src/
       exec.js realtime.js sse.js cache.js
   routes/
     api/                  json + sse endpoints
-    apps/ repos/ network/ settings/ login/ setup/   the pages that exist
+    apps/ repos/ databases/ network/ settings/ login/ setup/
 ```
 
 **`server/store/` vs `server/db/` is the distinction people get wrong.**

@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import * as db from '$srv/db/index.js';
+import { createDatabase } from '$srv/db/provision.js';
 import { record } from '$srv/store/audit.js';
 
 export async function GET({ url }) {
@@ -53,6 +54,11 @@ export async function POST({ request, locals, getClientAddress }) {
         const saved = await db.saveConnection(body.connection ?? body);
         audit('db.connection.save', saved.name, { type: saved.type });
         return json(saved);
+      }
+      case 'create': {
+        const created = await createDatabase(body);
+        audit('db.create', created.name, { type: created.type });
+        return json(created);
       }
       case 'delete': {
         const res = await db.deleteConnection(body.id);
