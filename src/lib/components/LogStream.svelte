@@ -2,7 +2,13 @@
   import { tick } from 'svelte';
   import { cn } from '$lib/utils.js';
 
-  let { lines = [], height = '440px', filter = $bindable(''), autoscroll = $bindable(true) } = $props();
+  let {
+    lines = [],
+    height = '440px',
+    failed = false,
+    filter = $bindable(''),
+    autoscroll = $bindable(true),
+  } = $props();
 
   let box = $state(null);
 
@@ -36,6 +42,11 @@
     </span>
   {/if}
   {#each shown as l, i (i)}
-    <div class={cn(l.stream === 'err' ? 'text-bad' : 'text-foreground/80')}>{l.line}</div>
+    <div
+      class={cn(
+        l.stream === 'err' ? 'text-muted-foreground' : 'text-foreground/80',
+        failed && l.stream === 'err' && 'text-bad',
+      )}
+    >{l.line}</div>
   {/each}
 </div>

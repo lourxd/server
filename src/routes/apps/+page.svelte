@@ -38,6 +38,7 @@
   import RefreshCcw from '@lucide/svelte/icons/refresh-ccw';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Check from '@lucide/svelte/icons/check';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import GitFork from '@lucide/svelte/icons/git-fork';
   import Link from '@lucide/svelte/icons/link';
   import FolderOpen from '@lucide/svelte/icons/folder-open';
@@ -90,6 +91,8 @@
 
   let runBuild = $state(true);
   let building = $state(false);
+  let buildFailed = $state(false);
+  let advanced = $state(false);
   let buildLines = $state([]);
 
   let importing = $state(false);
@@ -147,7 +150,9 @@
     imported = null;
     importLines = [];
     buildLines = [];
+    buildFailed = false;
     runBuild = true;
+    advanced = false;
     source = data.repos.length ? 'local' : data.github.connected ? 'github' : 'url';
     wizardOpen = true;
   }
@@ -263,11 +268,18 @@
   }
 
   const selectedRepo = $derived(data.repos.find((r) => r.relPath === form.cwd));
+  const commandPreview = $derived.by(() => {
+    if (isStatic) return `serve ${form.serveDir || 'dist'} on port ${form.servePort}`;
+    const parts = [form.interpreter || 'node', form.script || '<file>', form.args].filter(Boolean);
+    return parts.join(' ');
+  });
+
   const buildCmd = $derived(stack?.defaults?.build ?? '');
   const buildOutput = $derived(stack?.defaults?.buildOutput ?? '');
 
   async function runBuildStep() {
     building = true;
+    buildFailed = false;
     buildLines = [];
     let ok = false;
     try {
@@ -283,6 +295,7 @@
       buildLines = [...buildLines, { stream: 'err', line: err.message }];
     }
     building = false;
+    buildFailed = !ok;
     if (!ok) toasts.error('Build failed', 'The app was not started — see the build output.');
     return ok;
   }
@@ -747,35 +760,6 @@
           </Button>
         </div>
 
-        {#if buildCmd}
-          <div class="panel space-y-3 rounded-xl p-3.5">
-            <div class="flex items-start gap-2.5">
-              <Checkbox id="run-build" bind:checked={runBuild} disabled={building} />
-              <div class="min-w-0 flex-1">
-                <Label for="run-build" class="font-normal">
-                  Run <code class="font-mono text-[11.5px]">{buildCmd}</code> before starting
-                </Label>
-                {#if buildOutput}
-                  <p class="text-muted-foreground mt-1 text-[11.5px]">
-                    {stack.name} needs a production build in
-                    <code class="font-mono">{buildOutput}</code>. Without one the process exits on
-                    startup and PM2 restarts it until it gives up.
-                  </p>
-                {/if}
-              </div>
-            </div>
-
-            {#if building || buildLines.length}
-              <LogStream lines={buildLines} height="30vh" />
-            {/if}
-            {#if building}
-              <p class="text-muted-foreground flex items-center gap-2 text-xs">
-                <LoaderCircle class="size-3.5 animate-spin" /> Building…
-              </p>
-            {/if}
-          </div>
-        {/if}
-
         {#if mismatch}
           <Alert.Root>
             <TriangleAlert class="size-4" />
@@ -794,7 +778,7 @@
             <Alert.Description class="space-y-2">
               <p class="text-xs">
                 This project has <code class="font-mono">{selectedRepo.ecosystemFile}</code>. Starting from
-                it uses the settings it declares and ignores the fields below.
+                it uses the settings it declares and ignores everything below.
               </p>
               <Button size="sm" class="h-7" onclick={startFromEcosystem}>
                 Use {selectedRepo.ecosystemFile}
@@ -803,101 +787,149 @@
           </Alert.Root>
         {/if}
 
-        <div class="space-y-2">
-          <Label for="app-name">App name</Label>
-          <Input id="app-name" bind:value={form.name} placeholder={form.cwd || stack.id} />
+        <div class="accent-wash rounded-xl p-3.5">
+          <p class="eyebrow mb-1.5">What will run</p>
+          <p class="font-mono text-[12px] break-all">{commandPreview}</p>
+          <p class="text-muted-foreground mt-1.5 font-mono text-[10.5px] break-all">
+            in {form.cwd || 'projects root'}
+          </p>
         </div>
 
-        <div class="bg-border h-px"></div>
+        <div class="space-y-3">
+          <span class="eyebrow">Process</span>
 
-        {#if isStatic}
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-2">
-              <Label for="serve-dir">Build output</Label>
-              <Input id="serve-dir" bind:value={form.serveDir} class="font-mono text-xs" />
+          <div class="space-y-1.5">
+            <Label for="app-name">Name</Label>
+            <Input id="app-name" bind:value={form.name} placeholder={form.cwd || stack.id} />
+            <p class="text-muted-foreground text-[11.5px]">How it appears in this panel and in PM2.</p>
+          </div>
+
+          {#if isStatic}
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="space-y-1.5">
+                <Label for="serve-dir">Folder to serve</Label>
+                <Input id="serve-dir" bind:value={form.serveDir} class="font-mono text-xs" />
+                <p class="text-muted-foreground text-[11.5px]">
+                  Produced by <code class="font-mono">{buildCmd}</code>.
+                </p>
+              </div>
+              <div class="space-y-1.5">
+                <Label for="serve-port">Port</Label>
+                <Input id="serve-port" type="number" bind:value={form.servePort} />
+                <p class="text-muted-foreground text-[11.5px]">Where the site is served.</p>
+              </div>
             </div>
-            <div class="space-y-2">
-              <Label for="serve-port">Port</Label>
-              <Input id="serve-port" type="number" bind:value={form.servePort} />
+            <div class="flex items-start gap-2.5">
+              <Checkbox id="spa" bind:checked={form.serveSpa} />
+              <div>
+                <Label for="spa" class="font-normal">Single-page app</Label>
+                <p class="text-muted-foreground text-[11.5px]">
+                  Unknown paths return index.html instead of a 404, so client-side routing works.
+                </p>
+              </div>
             </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <Checkbox id="spa" bind:checked={form.serveSpa} />
-            <Label for="spa" class="font-normal">Single-page app fallback</Label>
-          </div>
-          <Alert.Root>
-            <Alert.Description class="text-xs">
-              Served by PM2's own static server, so it is supervised like any other app. Run
-              <code class="font-mono">{stack.defaults.build}</code> first so the output exists.
-            </Alert.Description>
-          </Alert.Root>
-        {:else}
-          <div class="space-y-2">
-            <Label for="script">Entry point</Label>
-            <Input id="script" bind:value={form.script} class="font-mono text-xs" />
-            <p class="text-muted-foreground text-xs">
-              {#if stack.defaults.build}
-                Run <code class="font-mono">{stack.defaults.build}</code> in the project first — the entry
-                point is the built output.
-              {:else}
-                Path relative to the project directory.
-              {/if}
-            </p>
-          </div>
+          {:else}
+            <div class="space-y-1.5">
+              <Label for="script">File to run</Label>
+              <Input id="script" bind:value={form.script} class="font-mono text-xs" />
+              <p class="text-muted-foreground text-[11.5px]">
+                Relative to the project.{#if buildOutput}
+                  {' '}Produced by <code class="font-mono">{buildCmd}</code>.
+                {/if}
+              </p>
+            </div>
 
-          <div class="space-y-2">
-            <Label for="args">Arguments</Label>
-            <Input id="args" bind:value={form.args} class="font-mono text-xs" placeholder="none" />
-          </div>
+            <div class="space-y-1.5">
+              <Label for="args">Arguments</Label>
+              <Input id="args" bind:value={form.args} class="font-mono text-xs" placeholder="none" />
+              <p class="text-muted-foreground text-[11.5px]">Passed to the command above.</p>
+            </div>
+          {/if}
+        </div>
 
-          <div class="grid grid-cols-3 gap-3">
-            <div class="space-y-2">
-              <Label>Mode</Label>
-              <Select.Root type="single" bind:value={form.execMode} disabled={!canCluster}>
-                <Select.Trigger>{form.execMode}</Select.Trigger>
-                <Select.Content>
-                  <Select.Item value="fork">fork</Select.Item>
-                  <Select.Item value="cluster">cluster</Select.Item>
-                </Select.Content>
-              </Select.Root>
-              {#if !canCluster}
-                <p class="text-muted-foreground text-xs">
-                  Cluster forks the Node runtime, so {stack.name} runs single-process.
+        <div class="space-y-3">
+          <EnvEditor bind:vars={form.envVars} />
+        </div>
+
+        <div class="space-y-3">
+          <button
+            type="button"
+            onclick={() => (advanced = !advanced)}
+            class="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 text-left transition-colors"
+          >
+            <ChevronRight class={cn('size-3.5 transition-transform', advanced && 'rotate-90')} />
+            <span class="eyebrow">Advanced</span>
+            <span class="text-muted-foreground ml-auto font-mono text-[10.5px]">
+              {form.execMode}{form.instances > 1 ? ` ×${form.instances}` : ''}{form.maxMemory
+                ? ` · ${form.maxMemory}`
+                : ''}
+            </span>
+          </button>
+
+          {#if advanced}
+            <div class="panel space-y-3.5 rounded-xl p-3.5">
+              {#if !isStatic}
+                <div class="grid gap-3 sm:grid-cols-3">
+                  <div class="space-y-1.5">
+                    <Label>Run as</Label>
+                    <Select.Root type="single" bind:value={form.execMode} disabled={!canCluster}>
+                      <Select.Trigger>
+                        {form.execMode === 'cluster' ? 'Several copies' : 'One process'}
+                      </Select.Trigger>
+                      <Select.Content>
+                        <Select.Item value="fork">One process</Select.Item>
+                        <Select.Item value="cluster">Several copies</Select.Item>
+                      </Select.Content>
+                    </Select.Root>
+                  </div>
+                  <div class="space-y-1.5">
+                    <Label for="instances">Copies</Label>
+                    <Input
+                      id="instances"
+                      type="number"
+                      min="1"
+                      max="64"
+                      bind:value={form.instances}
+                      disabled={form.execMode !== 'cluster'}
+                    />
+                  </div>
+                  <div class="space-y-1.5">
+                    <Label for="maxmem">Restart above</Label>
+                    <Input id="maxmem" bind:value={form.maxMemory} placeholder="512M" />
+                  </div>
+                </div>
+                <p class="text-muted-foreground text-[11.5px]">
+                  {#if !canCluster}
+                    {stack.name} runs as one process — several copies would each fork the Node
+                    runtime, which it does not support.
+                  {:else}
+                    Several copies share one port and use more cores. Leave the memory limit empty
+                    for no limit.
+                  {/if}
                 </p>
               {/if}
-            </div>
-            <div class="space-y-2">
-              <Label for="instances">Instances</Label>
-              <Input
-                id="instances"
-                type="number"
-                min="1"
-                max="64"
-                bind:value={form.instances}
-                disabled={form.execMode !== 'cluster'}
-              />
-            </div>
-            <div class="space-y-2">
-              <Label for="maxmem">Max memory</Label>
-              <Input id="maxmem" bind:value={form.maxMemory} placeholder="512M" />
-            </div>
-          </div>
-        {/if}
 
-        <div class="space-y-2">
-          <EnvEditor bind:vars={form.envVars} />
-          <p class="text-muted-foreground text-xs">One KEY=value per line.</p>
-        </div>
+              <div class="flex items-start gap-2.5">
+                <Checkbox id="autorestart" bind:checked={form.autorestart} />
+                <div>
+                  <Label for="autorestart" class="font-normal">Restart if it crashes</Label>
+                  <p class="text-muted-foreground text-[11.5px]">
+                    PM2 gives up after 10 crashes inside 5 seconds rather than looping forever.
+                  </p>
+                </div>
+              </div>
 
-        <div class="flex flex-wrap gap-5">
-          <div class="flex items-center gap-2">
-            <Checkbox id="watch" bind:checked={form.watch} />
-            <Label for="watch" class="font-normal">Restart on file change</Label>
-          </div>
-          <div class="flex items-center gap-2">
-            <Checkbox id="autorestart" bind:checked={form.autorestart} />
-            <Label for="autorestart" class="font-normal">Auto-restart on crash</Label>
-          </div>
+              <div class="flex items-start gap-2.5">
+                <Checkbox id="watch" bind:checked={form.watch} />
+                <div>
+                  <Label for="watch" class="font-normal">Restart when files change</Label>
+                  <p class="text-muted-foreground text-[11.5px]">
+                    For development. On a built app this restarts on every write to the output.
+                  </p>
+                </div>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}
