@@ -142,9 +142,10 @@ and reconnects to the daemon on its own.
 
 - **Overview** — Everything about the machine on one scrolling page: CPU,
   memory, disk and network vitals; app roll-up and recent lifecycle events;
-  per-core load and temperatures; 4-minute history for processor, memory,
-  network and disk I/O; all filesystems; network interfaces; the top 25 OS
-  processes.
+  per-core load and temperatures; 4-minute history for processor, memory and
+  disk I/O; all filesystems; and the top 25 OS processes.
+- **Network** — Inbound/outbound rates and totals, 4-minute throughput history,
+  and per-interface counters with live activity bars.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail with a live log stream, config and environment.
 - **Settings** — Projects directory, storage paths, the machine and
@@ -267,5 +268,5 @@ src/
     format.js              byte/duration/relative-time helpers
   routes/
     api/                   health, stream, apps, logs, repos, db, tunnels, dns, settings, auth
-    apps/ settings/ login/ setup/
+    apps/ network/ settings/ login/ setup/
 ```

@@ -115,7 +115,7 @@ src/
       exec.js realtime.js sse.js cache.js
   routes/
     api/                  json + sse endpoints
-    apps/ settings/ login/ setup/             the pages that exist
+    apps/ network/ settings/ login/ setup/    the pages that exist
 ```
 
 **`server/store/` vs `server/db/` is the distinction people get wrong.**
@@ -307,9 +307,13 @@ Do not treat these as bugs to discover — they are known and deferred.
 - **Light mode is undesigned** (§6).
 - **System / Repos / Databases / Tunnels / DNS pages were removed**, but their
   API routes and `server/` modules remain. Repos/DBs/Tunnels/DNS are to be
-  folded into Apps, not deleted. System is gone for good — Overview absorbed
-  every panel it had, so Overview is now a long scrolling page rather than a
-  viewport-height dashboard.
+  folded into Apps, not deleted. System is gone for good — its panels were
+  split across Overview (compute, storage, processes), Network (interfaces and
+  throughput) and Settings' System tab (the static machine/toolchain readout).
+  Overview is a long scrolling page now, not a viewport-height dashboard.
+- **Network is where ingress belongs.** When Tunnels and DNS come back, they go
+  on this page, not on pages of their own — a route and the interface it exits
+  through are the same question.
 - Deploy-wizard inner steps beyond the stack tiles are not fully restyled.
 - Connection state is no longer surfaced anywhere in the UI. `live.connected`
   still tracks it and reconnects; a dropped stream shows as stale numbers with

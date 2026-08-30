@@ -5,7 +5,6 @@
   import { STACK_BY_ID } from '$lib/stacks.js';
 
   import { Button } from '$lib/components/ui/button/index.js';
-  import { Badge } from '$lib/components/ui/badge/index.js';
   import * as Table from '$lib/components/ui/table/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
@@ -260,95 +259,49 @@
     </div>
   </div>
 
-  <div class="panel overflow-hidden rounded-2xl">
-    <div class="flex items-center gap-2.5 px-4.5 py-3.5">
-      <h2 class="text-[15px] font-semibold">Filesystems</h2>
-      <span class="text-muted-foreground ml-auto font-mono text-[10.5px]">
-        {slow?.disks?.length ?? 0} mounted
-      </span>
-    </div>
-    <div class="overflow-x-auto">
-      <Table.Root>
-        <Table.Header>
-          <Table.Row class="hover:bg-transparent">
-            <Table.Head>Mount</Table.Head>
-            <Table.Head>Device</Table.Head>
-            <Table.Head class="w-20">Type</Table.Head>
-            <Table.Head class="w-24 text-right">Size</Table.Head>
-            <Table.Head class="w-24 text-right">Used</Table.Head>
-            <Table.Head class="w-24 text-right">Free</Table.Head>
-            <Table.Head class="w-44">Usage</Table.Head>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {#each slow?.disks ?? [] as d (d.mount)}
-            <Table.Row>
-              <Table.Cell class="font-mono text-xs">{d.mount}</Table.Cell>
-              <Table.Cell class="text-muted-foreground font-mono text-xs">{d.fs}</Table.Cell>
-              <Table.Cell class="text-muted-foreground text-xs">{d.type}</Table.Cell>
-              <Table.Cell class="tabular text-right">{bytes(d.size)}</Table.Cell>
-              <Table.Cell class="tabular text-right">{bytes(d.used)}</Table.Cell>
-              <Table.Cell class="tabular text-right">{bytes(d.available)}</Table.Cell>
-              <Table.Cell>
-                <div class="flex items-center gap-2">
-                  <div class="bg-foreground/8 h-1.5 flex-1 overflow-hidden rounded-full">
-                    <div class={cn('h-full rounded-full', barTone(d.usePercent))} style="width:{d.usePercent}%"></div>
-                  </div>
-                  <span class="tabular w-9 text-right text-xs">{pct(d.usePercent, 0)}</span>
-                </div>
-              </Table.Cell>
-            </Table.Row>
-          {/each}
-          {#if !slow?.disks?.length}
-            <Table.Row>
-              <Table.Cell colspan={7} class="text-muted-foreground py-10 text-center">Collecting…</Table.Cell>
-            </Table.Row>
-          {/if}
-        </Table.Body>
-      </Table.Root>
-    </div>
-  </div>
-
   <div class="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
     <div class="panel overflow-hidden rounded-2xl">
       <div class="flex items-center gap-2.5 px-4.5 py-3.5">
-        <h2 class="text-[15px] font-semibold">Network interfaces</h2>
+        <h2 class="text-[15px] font-semibold">Filesystems</h2>
+        <span class="text-muted-foreground ml-auto font-mono text-[10.5px]">
+          {slow?.disks?.length ?? 0} mounted
+        </span>
       </div>
       <div class="overflow-x-auto">
         <Table.Root>
           <Table.Header>
             <Table.Row class="hover:bg-transparent">
-              <Table.Head>Interface</Table.Head>
-              <Table.Head class="w-24">State</Table.Head>
-              <Table.Head class="text-right">In</Table.Head>
-              <Table.Head class="text-right">Out</Table.Head>
+              <Table.Head>Mount</Table.Head>
+              <Table.Head>Device</Table.Head>
+              <Table.Head class="w-20">Type</Table.Head>
+              <Table.Head class="w-24 text-right">Size</Table.Head>
+              <Table.Head class="w-24 text-right">Used</Table.Head>
+              <Table.Head class="w-24 text-right">Free</Table.Head>
+              <Table.Head class="w-44">Usage</Table.Head>
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            {#each m?.network.interfaces ?? [] as n (n.iface)}
+            {#each slow?.disks ?? [] as d (d.mount)}
               <Table.Row>
-                <Table.Cell class="font-mono text-xs">{n.iface}</Table.Cell>
+                <Table.Cell class="font-mono text-xs">{d.mount}</Table.Cell>
+                <Table.Cell class="text-muted-foreground font-mono text-xs">{d.fs}</Table.Cell>
+                <Table.Cell class="text-muted-foreground text-xs">{d.type}</Table.Cell>
+                <Table.Cell class="tabular text-right">{bytes(d.size)}</Table.Cell>
+                <Table.Cell class="tabular text-right">{bytes(d.used)}</Table.Cell>
+                <Table.Cell class="tabular text-right">{bytes(d.available)}</Table.Cell>
                 <Table.Cell>
-                  <Badge
-                    variant="outline"
-                    class={cn('gap-1.5', n.state === 'up' ? 'border-ok/40 text-ok' : 'text-muted-foreground')}
-                  >
-                    <span class="dot"></span>{n.state}
-                  </Badge>
-                </Table.Cell>
-                <Table.Cell class="tabular text-right text-xs">
-                  {bytes(n.rxSec)}/s
-                  <div class="text-muted-foreground">{bytes(n.rxTotal)}</div>
-                </Table.Cell>
-                <Table.Cell class="tabular text-right text-xs">
-                  {bytes(n.txSec)}/s
-                  <div class="text-muted-foreground">{bytes(n.txTotal)}</div>
+                  <div class="flex items-center gap-2">
+                    <div class="bg-foreground/8 h-1.5 flex-1 overflow-hidden rounded-full">
+                      <div class={cn('h-full rounded-full', barTone(d.usePercent))} style="width:{d.usePercent}%"></div>
+                    </div>
+                    <span class="tabular w-9 text-right text-xs">{pct(d.usePercent, 0)}</span>
+                  </div>
                 </Table.Cell>
               </Table.Row>
             {/each}
-            {#if !m?.network.interfaces?.length}
+            {#if !slow?.disks?.length}
               <Table.Row>
-                <Table.Cell colspan={4} class="text-muted-foreground py-10 text-center">Collecting…</Table.Cell>
+                <Table.Cell colspan={7} class="text-muted-foreground py-10 text-center">Collecting…</Table.Cell>
               </Table.Row>
             {/if}
           </Table.Body>
@@ -356,31 +309,22 @@
       </div>
     </div>
 
-    <div class="panel-raised space-y-3.5 rounded-2xl p-4.5">
-      <span class="eyebrow">Throughput · 4 min</span>
-      <div>
-        <p class="text-muted-foreground mb-1 font-mono text-[10.5px]">
-          Network in — peak {bytes(peak(hist?.netRx))}/s
-        </p>
-        <SparkBars data={hist?.netRx ?? []} tone="var(--ok)" bars={60} height={34} solid />
+    <div class="panel-raised space-y-4 rounded-2xl p-4.5">
+      <div class="flex items-baseline gap-2">
+        <span class="eyebrow">Disk I/O</span>
+        <span class="text-muted-foreground ml-auto font-mono text-[10.5px]">4 min</span>
       </div>
       <div>
-        <p class="text-muted-foreground mb-1 font-mono text-[10.5px]">
-          Network out — peak {bytes(peak(hist?.netTx))}/s
+        <p class="text-muted-foreground mb-1.5 font-mono text-[10.5px]">
+          Read — peak {num(peak(hist?.diskRead))} IO/s
         </p>
-        <SparkBars data={hist?.netTx ?? []} tone="var(--info)" bars={60} height={34} solid />
+        <SparkBars data={hist?.diskRead ?? []} tone="var(--warn)" bars={60} height={54} solid />
       </div>
       <div>
-        <p class="text-muted-foreground mb-1 font-mono text-[10.5px]">
-          Disk read — peak {num(peak(hist?.diskRead))} IO/s
+        <p class="text-muted-foreground mb-1.5 font-mono text-[10.5px]">
+          Write — peak {num(peak(hist?.diskWrite))} IO/s
         </p>
-        <SparkBars data={hist?.diskRead ?? []} tone="var(--warn)" bars={60} height={28} solid />
-      </div>
-      <div>
-        <p class="text-muted-foreground mb-1 font-mono text-[10.5px]">
-          Disk write — peak {num(peak(hist?.diskWrite))} IO/s
-        </p>
-        <SparkBars data={hist?.diskWrite ?? []} tone="var(--bad)" bars={60} height={28} solid />
+        <SparkBars data={hist?.diskWrite ?? []} tone="var(--bad)" bars={60} height={54} solid />
       </div>
     </div>
   </div>

@@ -12,6 +12,7 @@
 
   import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
   import Boxes from '@lucide/svelte/icons/boxes';
+  import Network from '@lucide/svelte/icons/network';
   import Settings from '@lucide/svelte/icons/settings';
   import LogOut from '@lucide/svelte/icons/log-out';
   import Server from '@lucide/svelte/icons/server';
@@ -41,6 +42,7 @@
   const NAV = [
     { href: '/', label: 'Overview', icon: LayoutDashboard },
     { href: '/apps', label: 'Apps', icon: Boxes },
+    { href: '/network', label: 'Network', icon: Network },
   ];
 
   const isActive = (href) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
