@@ -141,7 +141,7 @@
     localRepo = '';
     imported = null;
     importLines = [];
-    source = data.github.connected ? 'github' : 'url';
+    source = data.repos.length ? 'local' : data.github.connected ? 'github' : 'url';
     wizardOpen = true;
   }
 
@@ -152,7 +152,12 @@
       return;
     }
     step = 2;
-    if (source === 'github' && data.github.connected && !ghRepos.length) loadGithub();
+    onSourceChange(source);
+  }
+
+  function onSourceChange(value) {
+    source = value;
+    if (value === 'github' && data.github.connected && !ghRepos.length) loadGithub();
   }
 
   async function loadGithub() {
@@ -542,17 +547,50 @@
             </p>
           {/if}
         {:else}
-          <Tabs.Root bind:value={source}>
+          <Tabs.Root bind:value={source} onValueChange={onSourceChange}>
             <Tabs.List class="w-full">
+              <Tabs.Trigger value="local" class="flex-1 gap-1.5">
+                <FolderOpen class="size-3.5" /> Repositories
+              </Tabs.Trigger>
               <Tabs.Trigger value="github" class="flex-1 gap-1.5">
                 <GitFork class="size-3.5" /> GitHub
               </Tabs.Trigger>
               <Tabs.Trigger value="url" class="flex-1 gap-1.5"><Link class="size-3.5" /> Git URL</Tabs.Trigger>
-              <Tabs.Trigger value="local" class="flex-1 gap-1.5">
-                <FolderOpen class="size-3.5" /> On server
-              </Tabs.Trigger>
             </Tabs.List>
 
+                        <Tabs.Content value="local" class="space-y-3 pt-3">
+              {#if !data.repos.length}
+                <div class="flex flex-col items-center gap-2.5 py-8 text-center">
+                  <p class="text-muted-foreground text-sm">Nothing cloned to this server yet.</p>
+                  <Button variant="outline" size="sm" class="h-7" href="/repos">
+                    <GitFork class="size-3.5" /> Go to Repositories
+                  </Button>
+                </div>
+              {:else}
+                <div class="max-h-64 space-y-1 overflow-auto rounded-md border p-1">
+                  {#each data.repos as r (r.relPath)}
+                    <button
+                      type="button"
+                      onclick={() => (localRepo = r.relPath)}
+                      class={cn(
+                        'flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors',
+                        localRepo === r.relPath ? 'bg-accent ring-primary/40 ring-1' : 'hover:bg-accent/60',
+                      )}
+                    >
+                      <FolderOpen class="text-muted-foreground size-4 shrink-0" />
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium">{r.relPath}</p>
+                        <p class="text-muted-foreground text-[11px]">
+                          {r.pkg?.name ?? 'no package.json'}
+                          {#if !r.hasNodeModules && r.pkg} · dependencies not installed{/if}
+                        </p>
+                      </div>
+                      {#if localRepo === r.relPath}<Check class="text-ok size-4 shrink-0" />{/if}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </Tabs.Content>
                         <Tabs.Content value="github" class="space-y-3 pt-3">
               {#if !data.github.connected}
                 <Alert.Root>
@@ -643,36 +681,6 @@
               </div>
             </Tabs.Content>
 
-                        <Tabs.Content value="local" class="space-y-3 pt-3">
-              {#if !data.repos.length}
-                <p class="text-muted-foreground py-8 text-center text-sm">
-                  No projects on this server yet. Import one from GitHub or a git URL.
-                </p>
-              {:else}
-                <div class="max-h-64 space-y-1 overflow-auto rounded-md border p-1">
-                  {#each data.repos as r (r.relPath)}
-                    <button
-                      type="button"
-                      onclick={() => (localRepo = r.relPath)}
-                      class={cn(
-                        'flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors',
-                        localRepo === r.relPath ? 'bg-accent ring-primary/40 ring-1' : 'hover:bg-accent/60',
-                      )}
-                    >
-                      <FolderOpen class="text-muted-foreground size-4 shrink-0" />
-                      <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-medium">{r.relPath}</p>
-                        <p class="text-muted-foreground text-[11px]">
-                          {r.pkg?.name ?? 'no package.json'}
-                          {#if !r.hasNodeModules && r.pkg} · dependencies not installed{/if}
-                        </p>
-                      </div>
-                      {#if localRepo === r.relPath}<Check class="text-ok size-4 shrink-0" />{/if}
-                    </button>
-                  {/each}
-                </div>
-              {/if}
-            </Tabs.Content>
           </Tabs.Root>
 
           {#if source !== 'local'}
