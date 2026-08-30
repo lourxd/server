@@ -100,21 +100,24 @@
     { label: 'Restarts', value: num(app.restarts), sub: `${num(app.unstableRestarts)} unstable` },
   ]);
 
-  const CONFIG = $derived([
-    ['PM2 id', app.pmId],
-    ['PID', app.pid ?? '—'],
-    ['Namespace', app.namespace],
-    ['Script', app.script],
+  const COMMAND = $derived(
+    [app.interpreter || 'node', app.script, Array.isArray(app.args) ? app.args.join(' ') : app.args]
+      .filter(Boolean)
+      .join(' '),
+  );
+
+  const PROCESS = $derived([
     ['Working directory', app.cwd],
-    ['Interpreter', app.interpreter ?? '—'],
-    ['Arguments', Array.isArray(app.args) ? app.args.join(' ') || '—' : app.args || '—'],
-    ['Exec mode', `${app.execMode} × ${app.instances}`],
-    ['Auto-restart', app.autorestart ? 'yes' : 'no'],
-    ['Watching', app.watching ? 'yes' : 'no'],
-    ['Node version', app.nodeVersion ?? '—'],
-    ['Out log', app.outLog ?? '—'],
-    ['Error log', app.errLog ?? '—'],
-    ['Created', app.createdAt ? new Date(app.createdAt).toLocaleString() : '—'],
+    ['Runs as', `${app.execMode}${app.instances > 1 ? ` × ${app.instances} copies` : ''}`],
+    ['Node', app.nodeVersion ?? '—'],
+    ['Deployed', app.createdAt ? new Date(app.createdAt).toLocaleString() : '—'],
+  ]);
+
+  const SUPERVISION = $derived([
+    ['Restart if it crashes', app.autorestart ? 'yes' : 'no'],
+    ['Restart on file change', app.watching ? 'yes' : 'no'],
+    ['Memory limit', app.maxMemoryRestart ? bytes(app.maxMemoryRestart) : 'none'],
+    ['PM2 id / PID', `${app.pmId} / ${app.pid ?? '—'}`],
   ]);
 </script>
 
@@ -199,14 +202,31 @@
         {/each}
       </div>
 
-      <div class="panel rounded-2xl p-4.5">
-        <span class="eyebrow">Configuration</span>
-        <dl class="mt-3 grid gap-x-6 gap-y-2.5 sm:grid-cols-[minmax(9rem,auto)_1fr]">
-          {#each CONFIG as [key, value] (key)}
-            <dt class="text-muted-foreground text-[12.5px]">{key}</dt>
-            <dd class="font-mono text-[11.5px] break-all">{value}</dd>
-          {/each}
-        </dl>
+      <div class="accent-wash rounded-2xl p-4.5">
+        <p class="eyebrow mb-1.5">Command</p>
+        <p class="font-mono text-[12.5px] break-all">{COMMAND}</p>
+      </div>
+
+      <div class="grid gap-3 lg:grid-cols-2">
+        <div class="panel rounded-2xl p-4.5">
+          <span class="eyebrow">Process</span>
+          <dl class="mt-3 grid gap-x-6 gap-y-2.5 sm:grid-cols-[minmax(8.5rem,auto)_1fr]">
+            {#each PROCESS as [key, value] (key)}
+              <dt class="text-muted-foreground text-[12.5px]">{key}</dt>
+              <dd class="font-mono text-[11.5px] break-all">{value}</dd>
+            {/each}
+          </dl>
+        </div>
+
+        <div class="panel rounded-2xl p-4.5">
+          <span class="eyebrow">Supervision</span>
+          <dl class="mt-3 grid gap-x-6 gap-y-2.5 sm:grid-cols-[minmax(8.5rem,auto)_1fr]">
+            {#each SUPERVISION as [key, value] (key)}
+              <dt class="text-muted-foreground text-[12.5px]">{key}</dt>
+              <dd class="font-mono text-[11.5px] break-all">{value}</dd>
+            {/each}
+          </dl>
+        </div>
       </div>
     </Tabs.Content>
 
@@ -242,9 +262,10 @@
         </Card.Header>
         <Card.Content class="p-3">
           <LogStream lines={logs} bind:filter bind:autoscroll height="52vh" />
-          <p class="text-muted-foreground mt-2 text-xs">
-            {logs.length} lines buffered · new output appears live
-          </p>
+          <div class="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px]">
+            <span>{logs.length} lines buffered · new output appears live</span>
+            <span class="ml-auto font-mono">{app.outLog ?? ''}</span>
+          </div>
         </Card.Content>
       </Card.Root>
     </Tabs.Content>

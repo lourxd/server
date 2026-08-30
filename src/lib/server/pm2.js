@@ -165,12 +165,32 @@ const SYSTEM_ENV = new Set([
 ]);
 
 const PANEL_ENV = /^(PM2|PM_|SCP_|PM2D_|npm_|NODE_OPTIONS$|unique_id$|axm_)/i;
+const AGENT_ENV = /^(SSH_|GPG_|GNOME_|DBUS_|SYSTEMD_|MANAGERPID|JOURNAL_|MEMORY_PRESSURE|XDG_|LC_|LESS|COLORTERM$|DESKTOP_|SESSION_)/i;
+
+export const ENV_KEYS_VAR = 'SCP_ENV_KEYS';
 
 export function appEnv(env) {
+  const all = env || {};
+
+  const declared = all[ENV_KEYS_VAR];
+  if (typeof declared === 'string') {
+    return Object.fromEntries(
+      declared
+        .split(',')
+        .map((k) => k.trim())
+        .filter((k) => k && k in all)
+        .map((k) => [k, all[k]]),
+    );
+  }
+
   return Object.fromEntries(
-    Object.entries(env || {}).filter(
+    Object.entries(all).filter(
       ([k, v]) =>
-        typeof v === 'string' && k === k.toUpperCase() && !SYSTEM_ENV.has(k) && !PANEL_ENV.test(k),
+        typeof v === 'string' &&
+        k === k.toUpperCase() &&
+        !SYSTEM_ENV.has(k) &&
+        !PANEL_ENV.test(k) &&
+        !AGENT_ENV.test(k),
     ),
   );
 }

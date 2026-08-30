@@ -18,11 +18,20 @@
 
   $effect(() => {
     shown.length;
-    if (!autoscroll || !box) return;
+    if (!box || !autoscroll) return;
     tick().then(() => {
       if (box) box.scrollTop = box.scrollHeight;
     });
   });
+
+  function pinToBottom(node) {
+    const jump = () => {
+      node.scrollTop = node.scrollHeight;
+    };
+    jump();
+    requestAnimationFrame(jump);
+    return {};
+  }
 
   function onscroll() {
     if (!box) return;
@@ -32,6 +41,7 @@
 
 <div
   bind:this={box}
+  use:pinToBottom
   {onscroll}
   style="max-height:{height}"
   class="bg-background/60 overflow-auto rounded-xl p-3.5 font-mono text-[11.5px] leading-[1.75] break-words whitespace-pre-wrap ring-1 ring-[var(--panel-ring)]"

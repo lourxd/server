@@ -127,6 +127,9 @@ async function startProcess(body) {
   const secrets = split.secret;
   if (Object.keys(secrets).length) writeEnvFile(cwd, secrets);
   if (body.stack && /^[a-z0-9-]{1,32}$/.test(body.stack)) env.SCP_STACK = body.stack;
+  env[pm2.ENV_KEYS_VAR] = Object.keys(env)
+    .filter((k) => k !== pm2.ENV_KEYS_VAR && k !== 'SCP_STACK')
+    .join(',');
 
   const name = String(body.name || path.basename(cwd)).trim();
   if (!/^[A-Za-z0-9._@/-]+$/.test(name)) error(400, 'Invalid app name.');

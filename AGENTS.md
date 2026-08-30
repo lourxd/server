@@ -305,6 +305,13 @@ has already succeeded (git lives in /usr/bin). `exec.js` prepends
 toolchain that runs the panel regardless of how it was launched; the unit sets
 `PATH` too.
 
+**PM2's process env is mostly the machine's, not the app's.** It carries
+whatever the daemon inherited — `SSH_AUTH_SOCK`, `GPG_AGENT_INFO`,
+`MANAGERPIDFDID`, XDG and systemd keys — so a denylist never keeps up. On start
+the panel stamps `SCP_ENV_KEYS` with the keys it set, and `appEnv()` returns
+exactly those; the denylist is only the fallback for apps started outside the
+panel.
+
 **Changing an app's environment means delete + start, not restart.** PM2's
 `restart` with `updateEnv: true` rebuilds the child env from the PANEL's
 `process.env` (`Common.safeExtend({}, process.env)` when `PM2_PROGRAMMATIC` is
