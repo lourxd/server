@@ -145,7 +145,9 @@ and reconnects to the daemon on its own.
   per-core load and temperatures; 4-minute history for processor, memory and
   disk I/O; all filesystems; and the top 25 OS processes.
 - **Network** — Inbound/outbound rates and totals, 4-minute throughput history,
-  and per-interface counters with live activity bars.
+  gateway and resolvers, per-interface addressing (IPv4, MAC, link speed, MTU)
+  with error and drop counters, and every listening port joined back to the app
+  that owns it.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail with a live log stream, config and environment.
 - **Settings** — Projects directory, storage paths, the machine and

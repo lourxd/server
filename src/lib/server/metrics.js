@@ -1,5 +1,57 @@
 import si from 'systeminformation';
 import os from 'node:os';
+import fs from 'node:fs';
+import { cached } from './cache.js';
+
+const LOOPBACK = /^lo\d*$/;
+
+function dnsServers() {
+  try {
+    return fs
+      .readFileSync('/etc/resolv.conf', 'utf8')
+      .split('\n')
+      .filter((l) => l.startsWith('nameserver'))
+      .map((l) => l.split(/\s+/)[1])
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function addressing() {
+  return cached('metrics:addressing', 60_000, async () => {
+    const [list, gateway] = await Promise.all([
+      si.networkInterfaces().catch(() => []),
+      si.networkGatewayDefault().catch(() => null),
+    ]);
+    const ifaces = Array.isArray(list) ? list : [list];
+    return {
+      gateway: gateway || null,
+      dns: dnsServers(),
+      interfaces: ifaces
+        .filter((i) => i && i.iface)
+        .map((i) => ({
+          iface: i.iface,
+          ip4: i.ip4 || null,
+          ip6: i.ip6 || null,
+          mac: i.mac || null,
+          mtu: i.mtu ?? null,
+          speed: i.speed ?? null,
+          type: i.type || null,
+          dhcp: !!i.dhcp,
+          internal: !!i.internal,
+          isDefault: !!i.default,
+        })),
+    };
+  });
+}
+
+const SCOPE = (addr) =>
+  addr === '0.0.0.0' || addr === '::' || addr === '*'
+    ? 'all'
+    : /^(127\.|::1$)/.test(addr)
+      ? 'local'
+      : 'bound';
 
 const HISTORY = 120;
 
@@ -63,11 +115,13 @@ export async function collectFast() {
   const [load, mem, net, disk] = await Promise.all([
     si.currentLoad(),
     si.mem(),
-    si.networkStats().catch(() => []),
+    si.networkStats('*').catch(() => []),
     si.disksIO().catch(() => null),
   ]);
 
-  const netAgg = (net || []).reduce((acc, n) => {
+  const external = (net || []).filter((n) => !LOOPBACK.test(n.iface));
+
+  const netAgg = external.reduce((acc, n) => {
     acc.rxSec += Math.max(0, n.rx_sec || 0);
     acc.txSec += Math.max(0, n.tx_sec || 0);
     acc.rxTotal += n.rx_bytes || 0;
@@ -105,6 +159,9 @@ export async function collectFast() {
         iface: n.iface, rxSec: Math.round(Math.max(0, n.rx_sec || 0)),
         txSec: Math.round(Math.max(0, n.tx_sec || 0)),
         rxTotal: n.rx_bytes, txTotal: n.tx_bytes, state: n.operstate,
+        rxErrors: n.rx_errors || 0, txErrors: n.tx_errors || 0,
+        rxDropped: n.rx_dropped || 0, txDropped: n.tx_dropped || 0,
+        loopback: LOOPBACK.test(n.iface),
       })),
     },
     diskIO: {
@@ -118,15 +175,38 @@ export async function collectFast() {
 }
 
 export async function collectSlow() {
-  const [fs, procs, temp] = await Promise.all([
+  const [disks, procs, temp, conns, net] = await Promise.all([
     si.fsSize().catch(() => []),
     si.processes().catch(() => ({ list: [], all: 0, running: 0, sleeping: 0 })),
     si.cpuTemperature().catch(() => null),
+    si.networkConnections().catch(() => []),
+    addressing().catch(() => ({ gateway: null, dns: [], interfaces: [] })),
   ]);
+
+  const seen = new Set();
+  const listening = (conns || [])
+    .filter((c) => c.state === 'LISTEN')
+    .map((c) => ({
+      protocol: c.protocol,
+      address: c.localAddress,
+      port: Number(c.localPort),
+      scope: SCOPE(c.localAddress),
+      pid: c.pid || null,
+      process: c.process || '',
+    }))
+    .filter((c) => {
+      const key = `${c.protocol}:${c.address}:${c.port}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => a.port - b.port || a.protocol.localeCompare(b.protocol));
 
   slowCache = {
     updatedAt: Date.now(),
-    disks: (fs || [])
+    network: net,
+    listening,
+    disks: (disks || [])
       .filter((d) => d.size > 0 && !/^\/(snap|sys|proc|run)/.test(d.mount))
       .map((d) => ({
         fs: d.fs, mount: d.mount, type: d.type, size: d.size,

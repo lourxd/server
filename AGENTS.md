@@ -290,6 +290,15 @@ internally. Grep the whole tree, `ui/` included.
 was called by `realtime.js` but not exported from `pm2.js`; the build succeeded
 and shutdown would have thrown.
 
+**`si.networkStats()` with no argument returns only the default interface.**
+Pass `'*'` for all of them. The interfaces table silently showed exactly one row
+until this was found. Filter loopback (`/^lo\d*$/`) out of the aggregate totals
+or `lo` traffic inflates them.
+
+**`si.networkConnections()` reports no PID for processes owned by other users.**
+The panel does not run as root, so system daemons come back with `pid: null` and
+an empty process name. The UI says "another user" rather than pretending.
+
 **shadcn's dark active-tab style is invisible in this palette**
 (`bg-input/30` over `bg-muted`). `tabs-trigger.svelte` overrides it.
 
