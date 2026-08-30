@@ -17,12 +17,12 @@
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import { Checkbox } from '$lib/components/ui/checkbox/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
-  import { Separator } from '$lib/components/ui/separator/index.js';
 
   import PageHeader from '$lib/components/PageHeader.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import TechLogo from '$lib/components/TechLogo.svelte';
+  import SparkBars from '$lib/components/SparkBars.svelte';
   import LogStream from '$lib/components/LogStream.svelte';
 
   import Plus from '@lucide/svelte/icons/plus';
@@ -46,8 +46,29 @@
 
   let { data } = $props();
 
-  let filter = $state('');
+  let statusFilter = $state('all');
   let busy = $state(new Set());
+
+  const FILTERS = [
+    { id: 'all', label: 'All', tone: 'var(--primary)' },
+    { id: 'online', label: 'Running', tone: 'var(--ok)' },
+    { id: 'errored', label: 'Errored', tone: 'var(--bad)' },
+    { id: 'stopped', label: 'Stopped', tone: 'var(--idle)' },
+  ];
+
+  const counts = $derived({
+    all: live.apps.length,
+    online: live.online,
+    errored: live.errored,
+    stopped: live.stopped,
+  });
+
+  const cpuHistory = new Map();
+  const sparkFor = (app) => {
+    const next = [...(cpuHistory.get(app.pmId) ?? []), app.cpu ?? 0].slice(-12);
+    cpuHistory.set(app.pmId, next);
+    return next;
+  };
   let confirmOpen = $state(false);
   let confirmState = $state({ title: '', description: '', label: '', action: null });
 
@@ -226,11 +247,7 @@
   }
 
   const shown = $derived(
-    filter
-      ? live.apps.filter(
-          (a) => a.name?.toLowerCase().includes(filter.toLowerCase()) || String(a.pmId) === filter,
-        )
-      : live.apps,
+    statusFilter === 'all' ? live.apps : live.apps.filter((a) => a.status === statusFilter),
   );
 
   function setBusy(id, on) {
@@ -288,149 +305,151 @@
 
 <svelte:head><title>Apps · {data.host?.hostname}</title></svelte:head>
 
-<PageHeader title="Apps">
-  {#snippet children()}
-    <Badge variant="outline" class={live.errored ? 'border-bad/40 text-bad' : 'border-ok/40 text-ok'}>
-      {live.online} online / {live.apps.length}
-    </Badge>
-  {/snippet}
+<PageHeader
+  title="Applications"
+  subtitle="{live.online} running · {live.errored} errored"
+>
   {#snippet actions()}
-    <div class="relative">
-      <Search class="text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 size-3.5" />
-      <Input placeholder="Filter apps…" bind:value={filter} class="h-9 w-44 pl-8" />
-    </div>
-    <Button size="sm" onclick={openWizard}><Plus class="size-4" /> New app</Button>
+    <Button onclick={openWizard} class="accent-fill h-8.5 rounded-xl px-4 font-semibold">
+      <Plus class="size-4" /> Deploy app
+    </Button>
   {/snippet}
 </PageHeader>
 
-<div class="flex-1 space-y-4 p-5">
+<div class="flex flex-1 flex-col gap-3.5 p-5 pt-3.5 md:p-6 md:pt-3.5">
+
   <div class="flex flex-wrap items-center gap-2">
-    <Button variant="outline" size="sm" disabled={!live.apps.length} onclick={() => askBulk('restartAll')}>
-      <RefreshCcw class="size-3.5" /> Restart all
-    </Button>
-    <Button variant="outline" size="sm" disabled={!live.online} onclick={() => askBulk('stopAll')}>
-      <Square class="size-3.5" /> Stop all
-    </Button>
-    <Button variant="outline" size="sm" disabled={!live.apps.length} onclick={save}>
-      <Save class="size-3.5" /> Save list
-    </Button>
-    <p class="text-muted-foreground tabular ml-auto text-xs">
-      {live.totalCpu.toFixed(1)}% CPU · {bytes(live.totalMem)} RAM
-    </p>
+    {#each FILTERS as f (f.id)}
+      <button
+        type="button"
+        onclick={() => (statusFilter = f.id)}
+        class={cn(
+          'inline-flex h-8 items-center gap-2 rounded-xl px-3 text-[12.5px] transition-all',
+          statusFilter === f.id ? 'accent-wash text-foreground' : 'panel text-muted-foreground hover:brightness-125',
+        )}
+      >
+        <span class="size-1.5 rounded-full" style="background:{f.tone}"></span>
+        {f.label}
+        <span class="tabular text-muted-foreground font-mono text-[11px]">{counts[f.id]}</span>
+      </button>
+    {/each}
+
+    <div class="ml-auto flex flex-wrap gap-2">
+      <Button variant="ghost" size="sm" class="panel h-8 rounded-xl" disabled={!live.apps.length} onclick={() => askBulk('restartAll')}>
+        <RefreshCcw class="size-3.5" /> Restart all
+      </Button>
+      <Button variant="ghost" size="sm" class="panel h-8 rounded-xl" disabled={!live.online} onclick={() => askBulk('stopAll')}>
+        <Square class="size-3.5" /> Stop all
+      </Button>
+      <Button variant="ghost" size="sm" class="panel h-8 rounded-xl" disabled={!live.apps.length} onclick={save}>
+        <Save class="size-3.5" /> Save list
+      </Button>
+    </div>
   </div>
 
-  <Card.Root class="overflow-hidden py-0">
-    {#if !live.apps.length}
-      <div class="flex flex-col items-center gap-3 px-6 py-16 text-center">
-        <div class="bg-muted grid size-11 place-items-center rounded-full">
-          <Boxes class="text-muted-foreground size-5" />
-        </div>
-        <div>
-          <h3 class="font-medium">No apps deployed yet</h3>
-          <p class="text-muted-foreground mt-1 text-sm">
-            Pick a stack and deploy — Next.js, SvelteKit, Express and more.
-          </p>
-        </div>
-        <Button size="sm" onclick={openWizard}><Plus class="size-4" /> New app</Button>
+  {#if !live.apps.length}
+    <div class="panel flex flex-col items-center gap-3 rounded-2xl px-6 py-20 text-center">
+      <div class="panel grid size-12 place-items-center rounded-full">
+        <Boxes class="text-muted-foreground size-5" />
       </div>
-    {:else}
-      <Table.Root>
-        <Table.Header>
-          <Table.Row class="hover:bg-transparent">
-            <Table.Head class="w-12 text-right">id</Table.Head>
-            <Table.Head>Name</Table.Head>
-            <Table.Head class="w-28">Status</Table.Head>
-            <Table.Head class="w-20 text-right">CPU</Table.Head>
-            <Table.Head class="w-24 text-right">Memory</Table.Head>
-            <Table.Head class="w-24 text-right">Uptime</Table.Head>
-            <Table.Head class="w-16 text-right">↺</Table.Head>
-            <Table.Head class="w-24">Mode</Table.Head>
-            <Table.Head class="w-56"></Table.Head>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {#each shown as app (app.pmId)}
-            <Table.Row>
-              <Table.Cell class="text-muted-foreground tabular text-right text-xs">{app.pmId}</Table.Cell>
-              <Table.Cell>
-                <div class="flex items-center gap-2">
-                  {#if app.stack && STACK_BY_ID[app.stack]}
-                    <TechLogo name={STACK_BY_ID[app.stack].logo} class="text-muted-foreground size-4 shrink-0" />
-                  {/if}
-                  <a href="/apps/{app.pmId}" class="font-medium hover:underline">{app.name}</a>
-                </div>
-                <p class="text-muted-foreground max-w-[22rem] truncate text-xs" title={app.script}>
-                  {app.script ?? ''}
-                </p>
-              </Table.Cell>
-              <Table.Cell><StatusBadge status={app.status} /></Table.Cell>
-              <Table.Cell class="tabular text-right">{app.cpu}%</Table.Cell>
-              <Table.Cell class="tabular text-right">{bytes(app.memory)}</Table.Cell>
-              <Table.Cell class="tabular text-right whitespace-nowrap">
-                {app.status === 'online' ? duration(app.uptime) : '—'}
-              </Table.Cell>
-              <Table.Cell class={cn('tabular text-right', !app.restarts && 'text-muted-foreground')}>
-                {num(app.restarts)}
-              </Table.Cell>
-              <Table.Cell class="text-muted-foreground text-xs">
-                {app.execMode}{app.instances > 1 ? ` ×${app.instances}` : ''}
-              </Table.Cell>
-              <Table.Cell>
-                <div class="flex justify-end gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    class="h-7 px-2"
-                    disabled={busy.has(app.pmId)}
-                    onclick={() => act(app, 'restart')}
-                  >
-                    <RotateCw class="size-3.5" />
-                  </Button>
-                  {#if app.status === 'online'}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      class="h-7 px-2"
-                      disabled={busy.has(app.pmId)}
-                      onclick={() => act(app, 'stop')}
-                    >
-                      <Square class="size-3.5" />
-                    </Button>
-                  {:else}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      class="h-7 px-2"
-                      disabled={busy.has(app.pmId)}
-                      onclick={() => act(app, 'restart')}
-                    >
-                      <Play class="size-3.5" />
-                    </Button>
-                  {/if}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    class="text-bad hover:text-bad hover:bg-bad/10 h-7 px-2"
-                    disabled={busy.has(app.pmId)}
-                    onclick={() => askDelete(app)}
-                  >
-                    <Trash2 class="size-3.5" />
-                  </Button>
-                </div>
-              </Table.Cell>
-            </Table.Row>
-          {/each}
-          {#if !shown.length}
-            <Table.Row>
-              <Table.Cell colspan={9} class="text-muted-foreground py-10 text-center">
-                No app matches “{filter}”.
-              </Table.Cell>
-            </Table.Row>
-          {/if}
-        </Table.Body>
-      </Table.Root>
-    {/if}
-  </Card.Root>
+      <div>
+        <h3 class="font-semibold">No apps deployed yet</h3>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Pick a stack, import from GitHub, and PM2 keeps it running.
+        </p>
+      </div>
+      <Button onclick={openWizard} class="accent-fill mt-1 rounded-xl px-4 font-semibold">
+        <Plus class="size-4" /> Deploy your first app
+      </Button>
+    </div>
+  {:else}
+    <div class="flex flex-col gap-2.5">
+      {#each shown as app (app.pmId)}
+        {@const bad = app.status === 'errored'}
+        {@const idle = app.status !== 'online'}
+        <div
+          class={cn(
+            'grid items-center gap-3.5 rounded-2xl px-4 py-3.5 transition-all',
+            'grid-cols-[1fr_auto] md:grid-cols-[1fr_104px_92px_78px_88px_112px]',
+            bad
+              ? 'bg-bad/7 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--bad)_30%,transparent),0_12px_30px_-22px_color-mix(in_srgb,var(--bad)_70%,transparent)]'
+              : 'panel-raised',
+          )}
+        >
+          <div class="flex min-w-0 items-center gap-3.5">
+            <div
+              class={cn(
+                'grid size-9.5 shrink-0 place-items-center rounded-xl',
+                bad ? 'bg-bad/14 text-bad' : 'bg-foreground/6 text-foreground/80',
+              )}
+            >
+              {#if app.stack && STACK_BY_ID[app.stack]}
+                <TechLogo name={STACK_BY_ID[app.stack].logo} class="size-5" />
+              {:else}
+                <Boxes class="size-5" />
+              {/if}
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <a href="/apps/{app.pmId}" class="truncate text-[14.5px] font-semibold hover:underline">
+                  {app.name}
+                </a>
+                <span class="bg-foreground/6 text-muted-foreground rounded-md px-1.5 py-0.5 font-mono text-[10px]">
+                  {app.execMode}{app.instances > 1 ? ` ×${app.instances}` : ''}
+                </span>
+              </div>
+              <p class="text-muted-foreground mt-0.5 truncate font-mono text-[11px]">{app.script ?? ''}</p>
+            </div>
+          </div>
+
+          <div class="hidden md:block"><StatusBadge status={app.status} /></div>
+
+          <div class="hidden md:block">
+            <SparkBars
+              data={sparkFor(app)}
+              tone={bad ? 'var(--bad)' : app.cpu > 40 ? 'var(--warn)' : 'var(--ok)'}
+              bars={12}
+            />
+          </div>
+
+          <div class="hidden text-right md:block">
+            <p class="tabular text-sm font-medium">{idle ? '—' : `${app.cpu}%`}</p>
+            <p class="eyebrow mt-0.5 text-[9px]">cpu</p>
+          </div>
+          <div class="hidden text-right md:block">
+            <p class="tabular text-muted-foreground text-sm font-medium">{bytes(app.memory)}</p>
+            <p class="eyebrow mt-0.5 text-[9px]">
+              {app.status === 'online' ? duration(app.uptime) : app.status}
+            </p>
+          </div>
+
+          <div class="flex justify-end gap-1.5">
+            <Button variant="ghost" size="icon" class="panel size-8 rounded-xl" disabled={busy.has(app.pmId)} onclick={() => act(app, 'restart')}>
+              <RotateCw class="size-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" class="panel size-8 rounded-xl" disabled={busy.has(app.pmId)} onclick={() => act(app, idle ? 'restart' : 'stop')}>
+              {#if idle}<Play class="size-3.5" />{:else}<Square class="size-3.5" />{/if}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="bg-bad/10 text-bad hover:bg-bad/20 hover:text-bad size-8 rounded-xl shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--bad)_22%,transparent)]"
+              disabled={busy.has(app.pmId)}
+              onclick={() => askDelete(app)}
+            >
+              <Trash2 class="size-3.5" />
+            </Button>
+          </div>
+        </div>
+      {/each}
+
+      {#if !shown.length}
+        <div class="panel text-muted-foreground rounded-2xl py-14 text-center text-sm">
+          No {statusFilter} apps.
+        </div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <Dialog.Root bind:open={wizardOpen}>
@@ -472,7 +491,7 @@
           <button
             type="button"
             onclick={() => chooseStack(s.id)}
-            class="hover:border-primary/60 hover:bg-accent focus-visible:ring-ring group flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            class="panel hover:accent-wash focus-visible:ring-ring group flex flex-col items-start gap-2.5 rounded-2xl p-3.5 text-left transition-all focus-visible:ring-2 focus-visible:outline-none"
           >
             <TechLogo name={s.logo} class="size-7 transition-transform group-hover:scale-110" />
             <div class="min-w-0">
@@ -693,7 +712,7 @@
           <Input id="app-name" bind:value={form.name} placeholder={form.cwd || stack.id} />
         </div>
 
-        <Separator />
+        <div class="bg-border h-px"></div>
 
         {#if isStatic}
           <div class="grid grid-cols-2 gap-3">
@@ -796,9 +815,12 @@
           <ArrowLeft class="size-4" /> Back
         </Button>
         {#if source === 'local'}
-          <Button disabled={!localRepo} onclick={useLocal}>Continue <ArrowRight class="size-4" /></Button>
+          <Button class="accent-fill rounded-xl px-4 font-semibold" disabled={!localRepo} onclick={useLocal}>
+            Continue <ArrowRight class="size-4" />
+          </Button>
         {:else}
           <Button
+            class="accent-fill rounded-xl px-4 font-semibold"
             disabled={importing || (source === 'github' ? !ghPicked : !cloneUrl.trim())}
             onclick={runImport}
           >
@@ -808,7 +830,11 @@
         {/if}
       {:else}
         <Button variant="outline" onclick={() => (step = 2)}><ArrowLeft class="size-4" /> Back</Button>
-        <Button disabled={isStatic ? !form.serveDir : !form.script} onclick={deploy}>
+        <Button
+          class="accent-fill rounded-xl px-4 font-semibold"
+          disabled={isStatic ? !form.serveDir : !form.script}
+          onclick={deploy}
+        >
           <Check class="size-4" /> Deploy
         </Button>
       {/if}

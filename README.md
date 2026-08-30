@@ -3,6 +3,9 @@
 A realtime web panel for one machine: apps, system resources, git/GitHub
 repositories, databases, Cloudflare Tunnels and DNS — all from one place.
 
+> Working on the code? Read [`AGENTS.md`](./AGENTS.md) first — conventions,
+> invariants and the gotchas that already cost someone a day.
+
 ## Stack
 
 | Layer | Choice |
@@ -143,21 +146,13 @@ and reconnects to the daemon on its own.
   detail with a live log stream, config and environment.
 - **System** — Per-core load, temperatures, filesystems, interfaces, throughput
   history, top 25 OS processes.
-- **Repositories** — Clone from any git URL or your GitHub account. Branch,
-  ahead/behind, dirty count, last commit. Pull, fetch, install deps, run `build`,
-  or launch into PM2. Long operations stream output live.
-- **Databases** — Connect to PostgreSQL, MySQL/MariaDB, MongoDB, Redis or a
-  SQLite file. Browse with sorting and paging, inspect schema, run SQL or
-  Redis/Mongo commands. Detects locally installed engines and can control their
-  services.
-- **Tunnels** — Publish a local app to the internet with **no inbound port
-  open**. Quick tunnels (`*.trycloudflare.com`, no account) or named tunnels
-  bound to your own hostnames. Each connector runs as a supervised PM2 process.
-- **DNS** — Manage Cloudflare records per zone: create, edit, delete, proxy
-  toggle, and a **Check** button that resolves the name against 1.1.1.1/8.8.8.8
-  so you see real propagation rather than just what Cloudflare stored.
 - **Settings** — Projects directory, GitHub and Cloudflare tokens, password,
   users, and the audit log.
+
+Repositories, Databases, Tunnels and DNS no longer have pages of their own. Repo
+import now lives inside the Apps deploy wizard; the rest are being folded into
+Apps. Their API routes and server modules are still in the tree and still work —
+see `src/routes/api/` — they simply have no UI at the moment.
 
 ## Cloudflare setup
 
@@ -167,7 +162,7 @@ Create a token at **Cloudflare → My Profile → API Tokens** with:
 - `Zone → DNS → Edit`
 - `Zone → Zone → Read`
 
-Then, on the Tunnels page, install `cloudflared` (downloads the static binary
+Then install `cloudflared` (downloads the static binary
 into `~/.local/bin`, no sudo). Creating a route writes a proxied CNAME to
 `<tunnel-id>.cfargotunnel.com` and pushes the ingress rule to Cloudflare; the
 record is removed again when you delete the route.
@@ -213,54 +208,15 @@ Both are accepted, not oversights:
 - `esbuild` (**moderate**) — transitive via `drizzle-kit`, a *devDependency*.
   It affects a dev server only and is absent from `build/`.
 
-### Hard-won gotchas
+### Contributing
 
-Bugs that cost real time here, kept so they are not rediscovered:
+Conventions, security invariants and the list of hard-won gotchas — the PM2 env
+leak, the hanging PM2 client, the GitHub Contents-vs-Metadata trap, and the rest
+— live in [`AGENTS.md`](./AGENTS.md). Read it before changing code.
 
-- **Never spread `process.env` into a PM2 app's env.** When this panel runs under
-  PM2, `process.env` carries PM2's own control variables (`pm_exec_path`,
-  `pm_cwd`, `pm_id`, `name`). Forwarding them makes PM2's fork container adopt
-  the panel's identity and relaunch *the panel* instead of the app.
-  `sanitizeEnv()` in `pm2.js` strips them — but lets `PM2_SERVE_*` through,
-  since those configure PM2's static server.
-- **`script: 'npm'` / `'npx'` is wrong for PM2.** It supervises the package
-  manager, not your app: signals don't propagate and reload/memory limits hit
-  the wrapper. Use the real binary (`node_modules/next/dist/bin/next`), or PM2's
-  built-in static server for a folder of files.
-- **The PM2 client does not fail loudly when its daemon dies.** Calls neither
-  resolve nor reject — they hang. Every call is bounded by a timeout, and a
-  failure resets the client and retries once.
-- **Migration SQL is read from disk at runtime**, and `adapter-node` does not
-  copy it into `build/`. Resolving it relative to `import.meta.url` works in dev
-  and breaks in the build.
-- **GitHub: listing a repo needs only Metadata, cloning needs Contents.** A
-  token with Metadata alone lists fine and then fails the clone with the
-  misleading *"Write access to repository not granted"*. `assertCloneAccess()`
-  probes Contents explicitly and says so plainly.
-- **A `$effect` that reads the state it writes re-triggers itself.** Load data in
-  `onMount`, not an effect guarded by its own results.
-- **shadcn's dark active-tab style is invisible in this palette** (`bg-input/30`
-  over `bg-muted`). `tabs-trigger.svelte` overrides it with a solid background.
+Two rules that surprise people: the source carries **no comments** (document in
+`AGENTS.md` instead), and **nothing in `dependencies` may need a compile step**.
 
-### Code style
-
-The source carries **no comments**. Names and structure are expected to carry
-the intent; anything that genuinely needs explaining belongs in this README,
-above. Two exceptions remain in the tree because they are functional, not
-explanatory: `<!-- svelte-ignore -->` directives and script shebangs.
-
-### UI conventions
-
-Every page is built from shadcn-svelte components. Two rules worth keeping:
-
-- **Confirmations are dialogs, never `window.confirm`.** Anything destructive goes
-  through `ConfirmDialog` (an `AlertDialog`), which states what will actually
-  happen — which files are deleted, what stops being reachable — and keeps itself
-  open until the action settles.
-- **Icons come from `@lucide/svelte`, imported one per path**
-  (`@lucide/svelte/icons/rotate-cw`) so only the icons used are bundled. Note that
-  lucide has dropped brand icons: there is no `github`, and `loader-2` is now
-  `loader-circle`.
 
 ## Layout
 
@@ -272,6 +228,7 @@ deploy/
 .env.example               documented configuration
 src/
   hooks.server.js          auth guard, boot sequence
+  app.css                  design tokens + the six composable panel classes
   lib/
     server/
       store/               ── the panel's own data (Drizzle)
@@ -300,10 +257,12 @@ src/
     components/
       ui/                  shadcn-svelte primitives (button, dialog, table, …)
       ConfirmDialog        AlertDialog-based confirmation, used by every page
-      PageHeader StatCard StatusBadge Sparkline DataTable LogStream
+      PageHeader StatCard StatusBadge TechLogo RadialGauge SparkBars
+      Sparkline DataTable LogStream
     live.svelte.js         shared EventSource, toasts, HTTP transport
+    stacks.js              deploy presets for the new-app wizard
     format.js              byte/duration/relative-time helpers
   routes/
     api/                   health, stream, apps, logs, repos, db, tunnels, dns, settings, auth
-    apps/ system/ repos/ databases/ tunnels/ dns/ settings/ login/ setup/
+    apps/ system/ settings/ login/ setup/
 ```

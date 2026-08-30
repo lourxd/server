@@ -1,25 +1,28 @@
 <script>
-  import { Badge } from '$lib/components/ui/badge/index.js';
   import { cn } from '$lib/utils.js';
 
   let { status = 'unknown', class: className = '' } = $props();
 
   const TONE = {
-    online: 'border-ok/40 bg-ok/10 text-ok',
-    healthy: 'border-ok/40 bg-ok/10 text-ok',
-    active: 'border-ok/40 bg-ok/10 text-ok',
-    launching: 'border-warn/40 bg-warn/10 text-warn',
-    stopping: 'border-warn/40 bg-warn/10 text-warn',
-    'waiting restart': 'border-warn/40 bg-warn/10 text-warn',
-    errored: 'border-bad/40 bg-bad/10 text-bad',
-    error: 'border-bad/40 bg-bad/10 text-bad',
+    online: 'bg-ok/14 text-ok',
+    healthy: 'bg-ok/14 text-ok',
+    active: 'bg-ok/14 text-ok',
+    streaming: 'bg-ok/14 text-ok',
+    launching: 'bg-warn/15 text-warn',
+    stopping: 'bg-warn/15 text-warn',
+    'waiting restart': 'bg-warn/15 text-warn',
+    errored: 'bg-bad/16 text-bad',
+    error: 'bg-bad/16 text-bad',
   };
 </script>
 
-<Badge
-  variant="outline"
-  class={cn('gap-1.5 font-medium', TONE[status] ?? 'border-idle/40 bg-idle/10 text-idle', className)}
+<span
+  class={cn(
+    'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium',
+    TONE[status] ?? 'bg-foreground/7 text-idle',
+    className,
+  )}
 >
-  <span class="size-1.5 rounded-full bg-current"></span>
+  <span class="dot"></span>
   {status}
-</Badge>
+</span>

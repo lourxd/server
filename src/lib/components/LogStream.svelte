@@ -28,7 +28,7 @@
   bind:this={box}
   {onscroll}
   style="max-height:{height}"
-  class="bg-muted/40 overflow-auto rounded-md border p-3 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap"
+  class="bg-background/60 overflow-auto rounded-xl p-3.5 font-mono text-[11.5px] leading-[1.75] break-words whitespace-pre-wrap ring-1 ring-[var(--panel-ring)]"
 >
   {#if !shown.length}
     <span class="text-muted-foreground">
@@ -36,6 +36,6 @@
     </span>
   {/if}
   {#each shown as l, i (i)}
-    <div class={cn(l.stream === 'err' ? 'text-bad' : 'text-foreground/85')}>{l.line}</div>
+    <div class={cn(l.stream === 'err' ? 'text-bad' : 'text-foreground/80')}>{l.line}</div>
   {/each}
 </div>

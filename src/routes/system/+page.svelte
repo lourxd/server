@@ -8,10 +8,10 @@
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
-  import { Progress } from '$lib/components/ui/progress/index.js';
 
   import PageHeader from '$lib/components/PageHeader.svelte';
   import Sparkline from '$lib/components/Sparkline.svelte';
+  import RadialGauge from '$lib/components/RadialGauge.svelte';
 
   import Search from '@lucide/svelte/icons/search';
   import Thermometer from '@lucide/svelte/icons/thermometer';
@@ -35,6 +35,17 @@
   );
 
   const tone = (v) => (v > 90 ? 'bg-bad' : v > 70 ? 'bg-warn' : 'bg-ok');
+  const toneVar = (v) => (v > 70 ? 'var(--bad)' : v > 40 ? 'var(--warn)' : 'var(--ok)');
+  const coreFill = (v) =>
+    v > 70
+      ? 'linear-gradient(180deg, var(--bad), color-mix(in srgb, var(--bad) 70%, black))'
+      : v > 40
+        ? 'linear-gradient(180deg, var(--warn), color-mix(in srgb, var(--warn) 70%, black))'
+        : 'linear-gradient(180deg, var(--ok), color-mix(in srgb, var(--ok) 70%, black))';
+  const coreGlow = (v) =>
+    v > 40
+      ? '0 0 14px -2px color-mix(in srgb, var(--warn) 60%, transparent)'
+      : '0 0 12px -3px color-mix(in srgb, var(--ok) 50%, transparent)';
   const peak = (arr) => (arr?.length ? Math.max(...arr) : 0);
 
   const MACHINE = $derived([
@@ -82,7 +93,7 @@
   {/snippet}
 </PageHeader>
 
-<div class="flex-1 p-5">
+<div class="flex-1 p-5 pt-3.5 md:p-6 md:pt-3.5">
   <Tabs.Root value="resources" class="space-y-4">
     <Tabs.List>
       <Tabs.Trigger value="resources">Resources</Tabs.Trigger>
@@ -93,12 +104,18 @@
 
     <Tabs.Content value="resources" class="space-y-3">
       <div class="grid gap-3 lg:grid-cols-2">
-        <Card.Root>
-          <Card.Header class="flex-row items-center gap-2">
-            <Card.Title class="text-base">CPU</Card.Title>
-            <div class="ml-auto flex gap-2">
-              <Badge variant="outline" class="tabular">{m ? pct(m.cpu.load) : '—'} now</Badge>
-              <Badge variant="outline" class="tabular">{pct(peak(hist?.cpu))} peak</Badge>
+        <Card.Root class="panel-raised">
+          <Card.Header class="flex-row items-center gap-3.5">
+            <RadialGauge value={m?.cpu.load ?? 0} size={52} stroke={6} tone={toneVar(m?.cpu.load ?? 0)} label="CPU" />
+            <div>
+              <Card.Title class="text-base">Processor</Card.Title>
+              <p class="text-muted-foreground mt-0.5 font-mono text-[11px]">
+                {data.host?.cpuCores} threads · {m ? pct(m.cpu.system) : '—'} system
+              </p>
+            </div>
+            <div class="ml-auto text-right">
+              <p class="tabular text-2xl font-semibold">{m ? pct(m.cpu.load) : '—'}</p>
+              <p class="text-muted-foreground font-mono text-[10px]">peak {pct(peak(hist?.cpu))}</p>
             </div>
           </Card.Header>
           <Card.Content class="space-y-3">
@@ -119,10 +136,25 @@
           </Card.Content>
         </Card.Root>
 
-        <Card.Root>
-          <Card.Header class="flex-row items-center gap-2">
-            <Card.Title class="text-base">Memory</Card.Title>
-            <Badge variant="outline" class="tabular ml-auto">{m ? pct(m.memory.usedPercent) : '—'}</Badge>
+        <Card.Root class="panel-raised">
+          <Card.Header class="flex-row items-center gap-3.5">
+            <RadialGauge
+              value={m?.memory.usedPercent ?? 0}
+              size={52}
+              stroke={6}
+              tone={toneVar(m?.memory.usedPercent ?? 0)}
+              label="Memory"
+            />
+            <div>
+              <Card.Title class="text-base">Memory</Card.Title>
+              <p class="text-muted-foreground mt-0.5 font-mono text-[11px]">
+                {m ? bytes(m.memory.used) : '—'} of {m ? bytes(m.memory.total) : '—'}
+              </p>
+            </div>
+            <div class="ml-auto text-right">
+              <p class="tabular text-2xl font-semibold">{m ? pct(m.memory.usedPercent) : '—'}</p>
+              <p class="text-muted-foreground font-mono text-[10px]">swap {m ? pct(m.memory.swapPercent, 0) : '—'}</p>
+            </div>
           </Card.Header>
           <Card.Content class="space-y-3">
             <Sparkline data={hist?.mem ?? []} max={100} height={88} color="var(--warn)" label="Memory history" />
@@ -146,20 +178,21 @@
 
       <Card.Root>
         <Card.Header class="flex-row items-center gap-2">
-          <Card.Title class="text-base">Per-core utilisation</Card.Title>
+          <Card.Title class="text-base">Cores</Card.Title>
           <span class="text-muted-foreground ml-auto text-xs">{m?.cpu.cores.length ?? 0} logical cores</span>
         </Card.Header>
         <Card.Content class="space-y-4">
           <div class="grid grid-cols-8 gap-2 md:grid-cols-16">
             {#each m?.cpu.cores ?? [] as c, i (i)}
-              <div class="space-y-1">
-                <div class="bg-muted flex h-10 items-end overflow-hidden rounded-sm">
+              <div class="space-y-1.5">
+                <div class="bg-foreground/6 flex h-24 items-end overflow-hidden rounded-lg">
                   <div
-                    class={cn('w-full rounded-b-sm transition-all duration-500', tone(c))}
-                    style="height:{Math.max(c, 3)}%"
+                    class="w-full rounded-b-lg transition-all duration-500"
+                    style="height:{Math.max(c, 5)}%; background:{coreFill(c)}; box-shadow:{coreGlow(c)}"
                   ></div>
                 </div>
-                <p class="text-muted-foreground tabular text-center text-[10px]">{i}: {Math.round(c)}%</p>
+                <p class="tabular text-center text-[11px] font-medium">{Math.round(c)}%</p>
+                <p class="text-muted-foreground text-center font-mono text-[9.5px]">c{i}</p>
               </div>
             {/each}
           </div>
@@ -174,7 +207,7 @@
     </Tabs.Content>
 
     <Tabs.Content value="storage" class="space-y-3">
-      <Card.Root class="gap-0 overflow-hidden py-0">
+      <Card.Root class="gap-0 py-0">
         <Card.Header class="border-b py-3"><Card.Title class="text-base">Filesystems</Card.Title></Card.Header>
         <Table.Root>
           <Table.Header>
@@ -199,7 +232,9 @@
                 <Table.Cell class="tabular text-right">{bytes(d.available)}</Table.Cell>
                 <Table.Cell>
                   <div class="flex items-center gap-2">
-                    <Progress value={d.usePercent} class="h-1.5 flex-1" indicatorClass={tone(d.usePercent)} />
+                    <div class="bg-foreground/8 h-1.5 flex-1 overflow-hidden rounded-full">
+                      <div class={cn('h-full rounded-full', tone(d.usePercent))} style="width:{d.usePercent}%"></div>
+                    </div>
                     <span class="tabular w-9 text-right text-xs">{pct(d.usePercent, 0)}</span>
                   </div>
                 </Table.Cell>
@@ -210,7 +245,7 @@
       </Card.Root>
 
       <div class="grid gap-3 lg:grid-cols-2">
-        <Card.Root class="gap-0 overflow-hidden py-0">
+        <Card.Root class="gap-0 py-0">
           <Card.Header class="border-b py-3">
             <Card.Title class="text-base">Network interfaces</Card.Title>
           </Card.Header>
@@ -271,7 +306,7 @@
     </Tabs.Content>
 
     <Tabs.Content value="processes">
-      <Card.Root class="gap-0 overflow-hidden py-0">
+      <Card.Root class="gap-0 py-0">
         <Card.Header class="flex-row flex-wrap items-center gap-3 border-b py-3">
           <Card.Title class="text-base">Top OS processes</Card.Title>
           <Badge variant="outline" class="tabular">{num(slow?.processCounts?.all)} total</Badge>

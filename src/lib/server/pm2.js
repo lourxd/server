@@ -91,6 +91,10 @@ function invoke(method, args) {
   });
 }
 
+export function disconnect() {
+  resetConnection();
+}
+
 export async function call(method, ...args) {
   await connect();
   try {

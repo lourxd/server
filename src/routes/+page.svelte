@@ -2,21 +2,16 @@
   import { live } from '$lib/live.svelte.js';
   import { bytes, duration, pct, relTime, num } from '$lib/format.js';
   import { cn } from '$lib/utils.js';
+  import { STACK_BY_ID } from '$lib/stacks.js';
 
-  import * as Card from '$lib/components/ui/card/index.js';
-  import * as Table from '$lib/components/ui/table/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
-  import { Badge } from '$lib/components/ui/badge/index.js';
-
   import PageHeader from '$lib/components/PageHeader.svelte';
   import StatCard from '$lib/components/StatCard.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
-  import Sparkline from '$lib/components/Sparkline.svelte';
+  import SparkBars from '$lib/components/SparkBars.svelte';
+  import TechLogo from '$lib/components/TechLogo.svelte';
 
-  import Cpu from '@lucide/svelte/icons/cpu';
-  import MemoryStick from '@lucide/svelte/icons/memory-stick';
-  import HardDrive from '@lucide/svelte/icons/hard-drive';
-  import ArrowDownUp from '@lucide/svelte/icons/arrow-down-up';
+  import Plus from '@lucide/svelte/icons/plus';
   import Boxes from '@lucide/svelte/icons/boxes';
 
   let { data } = $props();
@@ -25,221 +20,180 @@
   const slow = $derived(live.metrics?.slow);
   const hist = $derived(live.metrics?.history);
   const rootDisk = $derived(slow?.disks?.find((d) => d.mount === '/') ?? slow?.disks?.[0]);
-  const busiest = $derived([...live.apps].sort((a, b) => b.cpu - a.cpu).slice(0, 6));
+  const busiest = $derived([...live.apps].sort((a, b) => b.cpu - a.cpu).slice(0, 7));
 
-  const coreTone = (v) => (v > 90 ? 'bg-bad' : v > 70 ? 'bg-warn' : 'bg-ok');
+  const tone = (v) => (v > 70 ? 'var(--bad)' : v > 40 ? 'var(--warn)' : 'var(--ok)');
+  const coreTone = (v) =>
+    v > 70
+      ? 'linear-gradient(180deg, var(--bad), color-mix(in srgb, var(--bad) 70%, black))'
+      : v > 40
+        ? 'linear-gradient(180deg, var(--warn), color-mix(in srgb, var(--warn) 70%, black))'
+        : 'linear-gradient(180deg, var(--ok), color-mix(in srgb, var(--ok) 70%, black))';
 
-  const HOST = $derived([
-    ['Hostname', data.host?.hostname],
-    ['OS', data.host?.distro],
-    ['Kernel', data.host?.kernel],
-    ['CPU', data.host?.cpuModel],
-    ['Memory', bytes(data.host?.totalMemory)],
-    ['Node', `v${data.host?.node} · npm ${data.host?.npm}`],
-    ['Processes', `${num(slow?.processCounts?.all)} total, ${num(slow?.processCounts?.running)} running`],
-  ]);
+  const eventTone = (e) =>
+    e === 'exit' || e === 'error' ? 'var(--bad)' : e === 'online' ? 'var(--ok)' : 'var(--idle)';
 </script>
 
 <svelte:head><title>Overview · {data.host?.hostname}</title></svelte:head>
 
-<PageHeader title="Overview">
+<PageHeader
+  title="Overview"
+  subtitle={m
+    ? `${duration(m.uptime * 1000)} uptime · load ${m.cpu.loadavg.join(' ')}${slow?.temperature ? ` · ${slow.temperature.main}°C` : ''}`
+    : 'connecting…'}
+>
   {#snippet actions()}
-    {#if m}
-      <Badge variant="outline" class="tabular">up {duration(m.uptime * 1000)}</Badge>
-      <Badge variant="outline" class="tabular">load {m.cpu.loadavg.join('  ')}</Badge>
-    {/if}
+    <Button href="/apps" class="accent-fill h-8.5 rounded-xl px-4 font-semibold">
+      <Plus class="size-4" /> Deploy
+    </Button>
   {/snippet}
 </PageHeader>
 
-<div class="flex-1 space-y-4 p-5">
+<div class="flex flex-1 flex-col gap-3.5 p-5 pt-3.5 md:p-6 md:pt-3.5">
+
   <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
     <StatCard
-      label="CPU"
+      label="Processor"
       value={m ? pct(m.cpu.load) : '—'}
       sub="{data.host?.cpuCores} threads · {m ? pct(m.cpu.system) : '—'} sys"
       percent={m?.cpu.load ?? 0}
-      icon={Cpu}
-    >
-      <Sparkline data={hist?.cpu ?? []} max={100} height={32} label="CPU history" />
-    </StatCard>
-
+      tone={tone(m?.cpu.load ?? 0)}
+    />
     <StatCard
       label="Memory"
       value={m ? bytes(m.memory.used) : '—'}
       sub="of {m ? bytes(m.memory.total) : '—'} · swap {m ? pct(m.memory.swapPercent, 0) : '—'}"
       percent={m?.memory.usedPercent ?? 0}
-      icon={MemoryStick}
-    >
-      <Sparkline data={hist?.mem ?? []} max={100} height={32} color="var(--warn)" label="Memory history" />
-    </StatCard>
-
+      tone={tone(m?.memory.usedPercent ?? 0)}
+    />
     <StatCard
-      label="Disk — {rootDisk?.mount ?? '/'}"
-      value={rootDisk ? pct(rootDisk.usePercent, 0) : '—'}
-      sub={rootDisk
-        ? `${bytes(rootDisk.used)} of ${bytes(rootDisk.size)} · ${bytes(rootDisk.available)} free`
-        : '—'}
+      label="Disk {rootDisk?.mount ?? '/'}"
+      value={rootDisk ? bytes(rootDisk.used) : '—'}
+      sub={rootDisk ? `of ${bytes(rootDisk.size)} · ${bytes(rootDisk.available)} free` : '—'}
       percent={rootDisk?.usePercent ?? 0}
-      icon={HardDrive}
-    >
-      <p class="text-muted-foreground tabular mt-2 text-xs">
-        I/O ↓ {bytes(m?.diskIO.readSec ?? 0)}/s · ↑ {bytes(m?.diskIO.writeSec ?? 0)}/s
-      </p>
-    </StatCard>
-
+      tone={tone(rootDisk?.usePercent ?? 0)}
+    />
     <StatCard
       label="Network"
-      value="↓ {bytes(m?.network.rxSec ?? 0)}/s"
-      sub="↑ {bytes(m?.network.txSec ?? 0)}/s · {bytes(m?.network.rxTotal ?? 0)} in total"
-      icon={ArrowDownUp}
+      value="{bytes(m?.network.rxSec ?? 0)}/s"
+      sub="↑ {bytes(m?.network.txSec ?? 0)}/s · {bytes(m?.network.rxTotal ?? 0)} in"
     >
-      <Sparkline data={hist?.netRx ?? []} height={32} color="var(--ok)" label="Network in" />
+      <SparkBars data={hist?.netRx ?? []} tone="var(--info)" height={26} bars={16} class="mt-2" />
     </StatCard>
   </div>
 
-  <div class="grid gap-3 lg:grid-cols-2">
-    <Card.Root class="gap-0 overflow-hidden py-0">
-      <Card.Header class="flex-row items-center gap-3 border-b py-3">
-        <Card.Title class="text-base">Apps</Card.Title>
-        <Button variant="outline" size="sm" class="ml-auto h-8" href="/apps">Manage</Button>
-      </Card.Header>
+  <div class="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
 
-      <div class="grid grid-cols-4 divide-x border-b">
-        <div class="p-3">
-          <p class="text-muted-foreground text-[11px] font-semibold uppercase">Online</p>
-          <p class="text-ok tabular text-xl font-semibold">{live.online}</p>
-        </div>
-        <div class="p-3">
-          <p class="text-muted-foreground text-[11px] font-semibold uppercase">Stopped</p>
-          <p class="text-muted-foreground tabular text-xl font-semibold">{live.stopped}</p>
-        </div>
-        <div class="p-3">
-          <p class="text-muted-foreground text-[11px] font-semibold uppercase">Errored</p>
-          <p class={cn('tabular text-xl font-semibold', live.errored && 'text-bad')}>{live.errored}</p>
-        </div>
-        <div class="p-3">
-          <p class="text-muted-foreground text-[11px] font-semibold uppercase">RAM</p>
-          <p class="tabular text-xl font-semibold">{bytes(live.totalMem)}</p>
-        </div>
+    <div class="panel flex min-h-0 flex-col overflow-hidden rounded-2xl">
+      <div class="flex items-center gap-2.5 px-4.5 py-3.5">
+        <h2 class="text-[15px] font-semibold">Applications</h2>
+        <span class="tabular bg-ok/14 text-ok rounded-full px-2 py-0.5 font-mono text-[10.5px]">
+          {live.online} up
+        </span>
+        {#if live.errored}
+          <span class="tabular bg-bad/16 text-bad rounded-full px-2 py-0.5 font-mono text-[10.5px]">
+            {live.errored} down
+          </span>
+        {/if}
+        <Button variant="ghost" size="sm" href="/apps" class="ml-auto h-7 rounded-lg">Manage</Button>
       </div>
 
       {#if !live.apps.length}
-        <div class="flex flex-col items-center gap-3 px-6 py-12 text-center">
-          <div class="bg-muted grid size-10 place-items-center rounded-full">
+        <div class="flex flex-col items-center gap-3 px-6 py-14 text-center">
+          <div class="panel grid size-11 place-items-center rounded-full">
             <Boxes class="text-muted-foreground size-5" />
           </div>
-          <p class="text-muted-foreground text-sm">Clone a repository and start it to see it here.</p>
-          <Button size="sm" href="/repos">Go to repositories</Button>
+          <p class="text-muted-foreground text-sm">Nothing deployed yet.</p>
+          <Button size="sm" href="/apps" class="accent-fill rounded-xl px-4 font-semibold">
+            <Plus class="size-4" /> Deploy an app
+          </Button>
         </div>
       {:else}
-        <Table.Root>
-          <Table.Header>
-            <Table.Row class="hover:bg-transparent">
-              <Table.Head>App</Table.Head>
-              <Table.Head class="w-28">Status</Table.Head>
-              <Table.Head class="w-20 text-right">CPU</Table.Head>
-              <Table.Head class="w-24 text-right">Memory</Table.Head>
-              <Table.Head class="w-24 text-right">Uptime</Table.Head>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {#each busiest as app (app.pmId)}
-              <Table.Row>
-                <Table.Cell>
-                  <a href="/apps/{app.pmId}" class="font-medium hover:underline">{app.name}</a>
-                </Table.Cell>
-                <Table.Cell><StatusBadge status={app.status} /></Table.Cell>
-                <Table.Cell class="tabular text-right">{app.cpu}%</Table.Cell>
-                <Table.Cell class="tabular text-right">{bytes(app.memory)}</Table.Cell>
-                <Table.Cell class="tabular text-right">
-                  {app.status === 'online' ? duration(app.uptime) : '—'}
-                </Table.Cell>
-              </Table.Row>
-            {/each}
-          </Table.Body>
-        </Table.Root>
+        <div class="min-h-0 flex-1 space-y-2 overflow-y-auto px-2.5 pb-2.5">
+          {#each busiest as app (app.pmId)}
+            {@const bad = app.status === 'errored'}
+            <a
+              href="/apps/{app.pmId}"
+              class={cn(
+                'grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-2xl px-3.5 py-3 transition-all sm:grid-cols-[1fr_88px_72px_84px]',
+                bad
+                  ? 'bg-bad/7 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--bad)_30%,transparent)]'
+                  : 'panel hover:brightness-125',
+              )}
+            >
+              <div class="flex min-w-0 items-center gap-3">
+                <div
+                  class={cn(
+                    'grid size-9 shrink-0 place-items-center rounded-xl',
+                    bad ? 'bg-bad/14 text-bad' : 'bg-foreground/6 text-foreground/80',
+                  )}
+                >
+                  {#if app.stack && STACK_BY_ID[app.stack]}
+                    <TechLogo name={STACK_BY_ID[app.stack].logo} class="size-4.5" />
+                  {:else}
+                    <Boxes class="size-4.5" />
+                  {/if}
+                </div>
+                <div class="min-w-0">
+                  <p class="truncate text-[13.5px] font-semibold">{app.name}</p>
+                  <p class="text-muted-foreground truncate font-mono text-[11px]">{app.script ?? ''}</p>
+                </div>
+              </div>
+              <StatusBadge status={app.status} class="justify-self-start" />
+              <p class="tabular hidden text-right text-[13px] sm:block">{app.cpu}%</p>
+              <p class="tabular text-muted-foreground hidden text-right text-[13px] sm:block">
+                {bytes(app.memory)}
+              </p>
+            </a>
+          {/each}
+        </div>
       {/if}
-    </Card.Root>
+    </div>
 
-    <Card.Root class="gap-0 overflow-hidden py-0">
-      <Card.Header class="border-b py-3">
-        <Card.Title class="text-base">Recent activity</Card.Title>
-      </Card.Header>
-      {#if !live.events.length}
-        <p class="text-muted-foreground px-6 py-12 text-center text-sm">
-          No app events since this panel started.
-        </p>
-      {:else}
-        <Table.Root>
-          <Table.Body>
-            {#each live.events.slice(0, 9) as e, i (i)}
-              <Table.Row>
-                <Table.Cell class="w-1/3">
-                  <a href="/apps/{e.pmId}" class="hover:underline">{e.name}</a>
-                </Table.Cell>
-                <Table.Cell>
-                  <Badge
-                    variant="outline"
-                    class={cn(
-                      e.event === 'exit' || e.event === 'error'
-                        ? 'border-bad/40 text-bad'
-                        : e.event === 'online'
-                          ? 'border-ok/40 text-ok'
-                          : '',
-                    )}
-                  >
-                    {e.event}
-                  </Badge>
-                </Table.Cell>
-                <Table.Cell class="text-muted-foreground text-right text-xs whitespace-nowrap">
-                  {relTime(e.at)}
-                </Table.Cell>
-              </Table.Row>
-            {/each}
-          </Table.Body>
-        </Table.Root>
-      {/if}
-    </Card.Root>
-  </div>
-
-  <div class="grid gap-3 lg:grid-cols-2">
-    <Card.Root>
-      <Card.Header class="flex-row items-center gap-3">
-        <Card.Title class="text-base">Per-core load</Card.Title>
-        {#if slow?.temperature}
-          <Badge variant="outline" class="tabular ml-auto">{slow.temperature.main}°C</Badge>
-        {/if}
-      </Card.Header>
-      <Card.Content>
+    <div class="flex min-h-0 flex-col gap-3">
+      <div class="panel rounded-2xl p-4">
+        <div class="mb-3 flex items-center gap-2">
+          <span class="eyebrow">Cores</span>
+          <span class="text-muted-foreground ml-auto font-mono text-[10.5px]">
+            {m?.cpu.cores.length ?? 0} logical
+          </span>
+        </div>
         <div class="grid grid-cols-8 gap-1.5">
           {#each m?.cpu.cores ?? [] as c, i (i)}
-            <div class="space-y-1">
-              <div class="bg-muted flex h-8 items-end overflow-hidden rounded-sm">
-                <div
-                  class={cn('w-full rounded-b-sm transition-all duration-500', coreTone(c))}
-                  style="height:{Math.max(c, 3)}%"
-                ></div>
-              </div>
-              <p class="text-muted-foreground tabular text-center text-[10px]">{Math.round(c)}</p>
+            <div class="bg-foreground/6 flex h-7.5 items-end overflow-hidden rounded-md">
+              <div
+                class="w-full rounded-b-md transition-all duration-500"
+                style="height:{Math.max(c, 7)}%; background:{coreTone(c)}"
+              ></div>
             </div>
           {/each}
         </div>
-      </Card.Content>
-    </Card.Root>
+      </div>
 
-    <Card.Root>
-      <Card.Header class="flex-row items-center gap-3">
-        <Card.Title class="text-base">Host</Card.Title>
-        <Button variant="outline" size="sm" class="ml-auto h-8" href="/system">Details</Button>
-      </Card.Header>
-      <Card.Content>
-        <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[minmax(6rem,auto)_1fr]">
-          {#each HOST as [key, value] (key)}
-            <dt class="text-muted-foreground">{key}</dt>
-            <dd class="font-mono text-xs break-all">{value}</dd>
-          {/each}
-        </dl>
-      </Card.Content>
-    </Card.Root>
+      <div class="panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl p-4">
+        <div class="mb-2 flex items-center gap-2">
+          <span class="eyebrow">Activity</span>
+          <span class="text-muted-foreground ml-auto font-mono text-[10.5px]">{live.events.length} events</span>
+        </div>
+        {#if !live.events.length}
+          <p class="text-muted-foreground py-8 text-center text-sm">Nothing since this panel started.</p>
+        {:else}
+          <div class="min-h-0 flex-1 overflow-y-auto">
+            {#each live.events.slice(0, 12) as e, i (i)}
+              <div class="border-border/60 flex gap-2.5 border-b py-2 last:border-0">
+                <span class="mt-1.5 shrink-0" style="color:{eventTone(e.event)}"><span class="dot"></span></span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-[12.5px]">
+                    <span class="font-medium">{e.name}</span>
+                    <span class="text-muted-foreground">{e.event}</span>
+                  </p>
+                  <p class="text-muted-foreground font-mono text-[10px]">{relTime(e.at)}</p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </div>
   </div>
 </div>

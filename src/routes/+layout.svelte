@@ -3,14 +3,11 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { live } from '$lib/live.svelte.js';
-  import { bytes } from '$lib/format.js';
   import { authClient } from '$lib/auth-client.js';
   import { cn } from '$lib/utils.js';
 
   import { Toaster } from '$lib/components/ui/sonner/index.js';
-  import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
-  import { Separator } from '$lib/components/ui/separator/index.js';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
   import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
@@ -50,9 +47,9 @@
 
   const isActive = (href) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
 
-  const mem = $derived(live.metrics?.fast?.memory);
-  const cpu = $derived(live.metrics?.fast?.cpu);
   const initial = $derived((data.user?.name ?? data.user?.email ?? '?').charAt(0).toUpperCase());
+
+
 </script>
 
 {#if !data.authed}
@@ -60,78 +57,57 @@
 {:else}
   <div class="flex min-h-screen">
     <aside
-      class="bg-sidebar border-sidebar-border sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r md:flex"
+      class="sticky top-0 hidden h-screen w-58 shrink-0 flex-col p-3.5 md:flex"
     >
-      <div class="flex items-center gap-2.5 px-4 py-3.5">
-        <div class="from-ok to-info grid size-8 place-items-center rounded-lg bg-gradient-to-br">
-          <Server class="size-4 text-white" />
+      <div class="flex items-center gap-2.5 px-1.5 pb-4">
+        <div class="accent-fill grid size-8.5 shrink-0 place-items-center rounded-xl">
+          <Server class="size-4" />
         </div>
         <div class="min-w-0">
           <div class="truncate text-sm font-semibold">{data.host?.hostname ?? 'server'}</div>
-          <div class="text-muted-foreground truncate text-xs">{data.host?.distro ?? ''}</div>
+          <div class="text-muted-foreground truncate font-mono text-[10.5px]">{data.host?.distro ?? ''}</div>
         </div>
       </div>
 
-      <Separator />
-
-      <nav class="flex-1 space-y-0.5 overflow-y-auto p-2">
+      <nav class="flex-1 space-y-1 overflow-y-auto">
         {#each NAV as item (item.href)}
           {@const Icon = item.icon}
           <a
             href={item.href}
             class={cn(
-              'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors',
+              'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors',
               isActive(item.href)
-                ? 'bg-sidebar-accent text-foreground font-medium'
-                : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
+                ? 'accent-wash text-foreground font-medium'
+                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
             )}
           >
-            <Icon class="size-4 shrink-0" />
+            <Icon class={cn('size-4.25 shrink-0', isActive(item.href) && 'text-primary')} />
             <span class="truncate">{item.label}</span>
-            {#if item.href === '/apps' && live.apps.length}
-              <Badge
-                variant="outline"
-                class={cn(
-                  'ml-auto px-1.5 py-0 text-[10px]',
-                  live.errored ? 'border-bad/40 text-bad' : 'border-ok/40 text-ok',
-                )}
-              >
-                {live.online}/{live.apps.length}
-              </Badge>
+            {#if item.href === '/apps' && live.errored}
+              <span class="tabular bg-bad/16 text-bad ml-auto rounded-full px-1.5 font-mono text-[10.5px]">
+                {live.errored}
+              </span>
             {/if}
           </a>
         {/each}
       </nav>
 
-      <div class="space-y-2 p-2">
-        {#if cpu && mem}
-          <div class="text-muted-foreground tabular flex items-center gap-1.5 px-1.5 text-[11px]">
-            <Badge
-              variant="outline"
-              class={cn('gap-1 px-1.5 py-0', live.connected ? 'border-ok/40 text-ok' : 'border-bad/40 text-bad')}
-            >
-              <span class="size-1.5 rounded-full bg-current"></span>
-              {live.connected ? 'live' : 'offline'}
-            </Badge>
-            <span>{cpu.load}% · {bytes(mem.used)}</span>
-          </div>
-        {/if}
-
+      <div>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
               <button
                 {...props}
-                class="hover:bg-sidebar-accent flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors"
+                class="panel hover:bg-sidebar-accent flex w-full items-center gap-2.5 rounded-xl p-2.5 text-left transition-colors"
               >
                 <div
-                  class="bg-primary text-primary-foreground grid size-7 shrink-0 place-items-center rounded-md text-xs font-semibold"
+                  class="bg-foreground/10 text-foreground grid size-7.5 shrink-0 place-items-center rounded-lg text-xs font-bold"
                 >
                   {initial}
                 </div>
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-xs font-medium">{data.user?.name ?? 'Account'}</p>
-                  <p class="text-muted-foreground truncate text-[11px]">{data.user?.email}</p>
+                  <p class="text-muted-foreground truncate font-mono text-[10px]">{data.user?.email}</p>
                 </div>
                 <ChevronsUpDown class="text-muted-foreground size-3.5 shrink-0" />
               </button>
@@ -172,7 +148,7 @@
     </aside>
 
         <nav
-      class="bg-sidebar border-sidebar-border fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t md:hidden"
+      class="bg-background/90 border-sidebar-border fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t backdrop-blur md:hidden"
     >
       {#each NAV as item (item.href)}
         {@const Icon = item.icon}
@@ -199,7 +175,7 @@
       </a>
     </nav>
 
-    <div class="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
+    <div class="flex min-w-0 flex-1 flex-col pb-16 md:pb-0 md:pl-0">
       {@render children?.()}
     </div>
   </div>

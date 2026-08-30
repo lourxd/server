@@ -38,13 +38,10 @@
   import History from '@lucide/svelte/icons/clock-fading';
   import Link2Off from '@lucide/svelte/icons/link-2-off';
   import Plug from '@lucide/svelte/icons/plug';
-  import Cable from '@lucide/svelte/icons/cable';
-  import Globe from '@lucide/svelte/icons/globe';
   import Save from '@lucide/svelte/icons/save';
   import Lock from '@lucide/svelte/icons/lock';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import RefreshCcw from '@lucide/svelte/icons/refresh-ccw';
-  import CircleCheck from '@lucide/svelte/icons/circle-check';
 
   let { data } = $props();
 
@@ -207,13 +204,15 @@
 
 <svelte:head><title>Settings · {data.host?.hostname}</title></svelte:head>
 
-<PageHeader title="Settings">
+<PageHeader title="Settings" subtitle="integrations · account · access">
   {#snippet actions()}
-    <Badge variant="outline">{data.sessions} active session{data.sessions === 1 ? '' : 's'}</Badge>
+    <span class="panel tabular text-muted-foreground rounded-full px-3 py-1.5 font-mono text-[11px]">
+      {data.sessions} session{data.sessions === 1 ? '' : 's'}
+    </span>
   {/snippet}
 </PageHeader>
 
-<div class="flex-1 p-5">
+<div class="flex-1 p-5 pt-3.5 md:p-6 md:pt-3.5">
   <Tabs.Root value={tab} onValueChange={onTabChange} class="space-y-4">
     <Tabs.List>
       <Tabs.Trigger value="general" class="gap-1.5">
@@ -237,7 +236,7 @@
         <Card.Content>
           <div class="flex gap-2">
             <Input bind:value={projectsDir} spellcheck="false" class="font-mono text-xs" />
-            <Button disabled={savingDir || projectsDir === data.config.projectsDir} onclick={saveProjectsDir}>
+            <Button class="accent-fill rounded-xl px-4 font-semibold" disabled={savingDir || projectsDir === data.config.projectsDir} onclick={saveProjectsDir}>
               <Save class="size-4" />
               {savingDir ? 'Saving…' : 'Save'}
             </Button>
@@ -397,7 +396,7 @@
             {/if}
             <div class="flex gap-2">
               <Input type="password" bind:value={githubToken} placeholder="github_pat_… or ghp_…" autocomplete="off" />
-              <Button disabled={savingToken || !githubToken.trim()} onclick={saveToken}>
+              <Button class="accent-fill rounded-xl px-4 font-semibold" disabled={savingToken || !githubToken.trim()} onclick={saveToken}>
                 <Plug class="size-4" />
                 {savingToken ? 'Verifying…' : 'Connect'}
               </Button>
@@ -432,9 +431,7 @@
               <dd class="font-mono text-xs break-all">{data.cloudflare.accountId ?? '—'}</dd>
             </dl>
             <div class="flex gap-2">
-              <Button variant="outline" size="sm" href="/tunnels"><Cable class="size-4" /> Tunnels</Button>
-              <Button variant="outline" size="sm" href="/dns"><Globe class="size-4" /> DNS</Button>
-              <Button variant="destructive" size="sm" class="ml-auto" onclick={disconnectCloudflare}>
+              <Button variant="destructive" size="sm" onclick={disconnectCloudflare}>
                 <Link2Off class="size-4" /> Disconnect
               </Button>
             </div>
@@ -451,7 +448,7 @@
             {/if}
             <div class="flex gap-2">
               <Input type="password" bind:value={cfToken} placeholder="Cloudflare API token" autocomplete="off" />
-              <Button disabled={savingCf || !cfToken.trim()} onclick={saveCloudflare}>
+              <Button class="accent-fill rounded-xl px-4 font-semibold" disabled={savingCf || !cfToken.trim()} onclick={saveCloudflare}>
                 <Plug class="size-4" />
                 {savingCf ? 'Verifying…' : 'Connect'}
               </Button>
@@ -529,7 +526,7 @@
     </Tabs.Content>
 
     <Tabs.Content value="users" class="max-w-4xl space-y-3">
-      <Card.Root class="gap-0 overflow-hidden py-0">
+      <Card.Root class="gap-0 py-0">
         <Card.Header class="flex-row items-center gap-3 border-b py-3">
           <Card.Title class="flex items-center gap-2 text-base"><Users class="text-muted-foreground size-4" /> Users</Card.Title>
           <Badge variant="outline">{data.users.length}</Badge>
@@ -590,7 +587,7 @@
       </Card.Root>
 
       {#if data.isAdmin && data.audit.length}
-        <Card.Root class="gap-0 overflow-hidden py-0">
+        <Card.Root class="gap-0 py-0">
           <Card.Header class="flex-row items-center gap-3 border-b py-3">
             <Card.Title class="flex items-center gap-2 text-base"><History class="text-muted-foreground size-4" /> Recent activity</Card.Title>
             <span class="text-muted-foreground ml-auto text-xs">last {data.audit.length} actions</span>

@@ -1,11 +1,14 @@
 <script>
-  let { title, children, actions } = $props();
+  let { title, subtitle = '', children, actions } = $props();
 </script>
 
-<header
-  class="bg-background/95 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b px-5 py-3 backdrop-blur"
->
-  <h1 class="text-lg font-semibold tracking-tight">{title}</h1>
+<header class="flex flex-wrap items-center gap-3.5 px-5 pt-4.5 pb-1 md:px-6">
+  <div class="min-w-0">
+    <h1 class="text-[25px] font-semibold">{title}</h1>
+    {#if subtitle}
+      <p class="text-muted-foreground mt-0.5 font-mono text-[11.5px]">{subtitle}</p>
+    {/if}
+  </div>
   {@render children?.()}
   <div class="ml-auto flex flex-wrap items-center gap-2">
     {@render actions?.()}

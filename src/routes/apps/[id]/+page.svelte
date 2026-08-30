@@ -12,6 +12,10 @@
   import { Label } from '$lib/components/ui/label/index.js';
   import { Checkbox } from '$lib/components/ui/checkbox/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
+  import { cn } from '$lib/utils.js';
+  import { STACK_BY_ID } from '$lib/stacks.js';
+  import TechLogo from '$lib/components/TechLogo.svelte';
+  import Boxes from '@lucide/svelte/icons/boxes';
 
   import PageHeader from '$lib/components/PageHeader.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
@@ -63,6 +67,13 @@
 
   const envEntries = $derived(Object.entries(data.proc.env ?? {}));
 
+  const TILES = $derived([
+    { label: 'CPU', value: app.status === 'online' ? `${app.cpu}%` : '—', sub: `${app.instances} instance${app.instances === 1 ? '' : 's'}` },
+    { label: 'Memory', value: bytes(app.memory), sub: app.maxMemoryRestart ? `limit ${bytes(app.maxMemoryRestart)}` : 'no limit' },
+    { label: 'Uptime', value: app.status === 'online' ? duration(app.uptime) : '—', sub: app.startedAt ? `since ${relTime(app.startedAt)}` : 'not running' },
+    { label: 'Restarts', value: num(app.restarts), sub: `${num(app.unstableRestarts)} unstable` },
+  ]);
+
   const CONFIG = $derived([
     ['PM2 id', app.pmId],
     ['PID', app.pid ?? '—'],
@@ -83,69 +94,71 @@
 
 <svelte:head><title>{app.name} · Apps</title></svelte:head>
 
-<PageHeader title={app.name}>
-  {#snippet children()}
-    <StatusBadge status={app.status} />
-  {/snippet}
-  {#snippet actions()}
-    <Button variant="ghost" size="sm" href="/apps"><ArrowLeft class="size-4" /> Apps</Button>
-    <Button variant="outline" size="sm" onclick={() => act('restart')}>
+<div class="px-5 pt-4 md:px-6">
+  <a href="/apps" class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs">
+    <ArrowLeft class="size-3.5" /> Applications
+  </a>
+</div>
+
+<header class="flex flex-wrap items-center gap-3.5 px-5 pt-3 pb-1 md:px-6">
+  <div
+    class={cn(
+      'grid size-13 shrink-0 place-items-center rounded-2xl',
+      app.status === 'errored' ? 'bg-bad/14 text-bad' : 'panel-raised text-foreground',
+    )}
+  >
+    {#if app.stack && STACK_BY_ID[app.stack]}
+      <TechLogo name={STACK_BY_ID[app.stack].logo} class="size-6.5" />
+    {:else}
+      <Boxes class="size-6.5" />
+    {/if}
+  </div>
+  <div class="min-w-0">
+    <div class="flex items-center gap-2.5">
+      <h1 class="truncate text-[27px] font-semibold">{app.name}</h1>
+      <StatusBadge status={app.status} />
+    </div>
+    <p class="text-muted-foreground mt-0.5 truncate font-mono text-[11.5px]">
+      {app.cwd ?? ''} · {app.execMode}{app.instances > 1 ? ` ×${app.instances}` : ''}
+    </p>
+  </div>
+
+  <div class="ml-auto flex flex-wrap items-center gap-2">
+    <Button variant="ghost" size="sm" class="panel h-8.5 rounded-xl" onclick={() => act('restart')}>
       <RotateCw class="size-3.5" /> Restart
     </Button>
     {#if app.execMode === 'cluster'}
-      <Button variant="outline" size="sm" onclick={() => act('reload')}>Reload</Button>
+      <Button variant="ghost" size="sm" class="panel h-8.5 rounded-xl" onclick={() => act('reload')}>Reload</Button>
     {/if}
     {#if app.status === 'online'}
-      <Button variant="outline" size="sm" onclick={() => act('stop')}><Square class="size-3.5" /> Stop</Button>
+      <Button variant="ghost" size="sm" class="panel h-8.5 rounded-xl" onclick={() => act('stop')}>
+        <Square class="size-3.5" /> Stop
+      </Button>
     {:else}
-      <Button size="sm" onclick={() => act('restart')}><Play class="size-3.5" /> Start</Button>
+      <Button size="sm" class="accent-fill h-8.5 rounded-xl px-4 font-semibold" onclick={() => act('restart')}>
+        <Play class="size-3.5" /> Start
+      </Button>
     {/if}
     <Button
       variant="ghost"
-      size="sm"
-      class="text-bad hover:text-bad hover:bg-bad/10"
+      size="icon"
+      class="bg-bad/10 text-bad hover:bg-bad/20 hover:text-bad size-8.5 rounded-xl shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--bad)_22%,transparent)]"
       onclick={() => (confirmOpen = true)}
     >
-      <Trash2 class="size-3.5" /> Delete
+      <Trash2 class="size-3.5" />
     </Button>
-  {/snippet}
-</PageHeader>
+  </div>
+</header>
 
-<div class="flex-1 space-y-4 p-5">
-  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-    <Card.Root class="py-4">
-      <Card.Header class="px-4">
-        <Card.Description class="text-[11px] font-semibold tracking-wide uppercase">CPU</Card.Description>
-        <Card.Title class="tabular text-2xl">{app.cpu}%</Card.Title>
-      </Card.Header>
-    </Card.Root>
-    <Card.Root class="py-4">
-      <Card.Header class="px-4">
-        <Card.Description class="text-[11px] font-semibold tracking-wide uppercase">Memory</Card.Description>
-        <Card.Title class="tabular text-2xl">{bytes(app.memory)}</Card.Title>
-        <p class="text-muted-foreground text-xs">
-          {app.maxMemoryRestart ? `limit ${bytes(app.maxMemoryRestart)}` : 'no limit'}
-        </p>
-      </Card.Header>
-    </Card.Root>
-    <Card.Root class="py-4">
-      <Card.Header class="px-4">
-        <Card.Description class="text-[11px] font-semibold tracking-wide uppercase">Uptime</Card.Description>
-        <Card.Title class="tabular text-2xl">
-          {app.status === 'online' ? duration(app.uptime) : '—'}
-        </Card.Title>
-        <p class="text-muted-foreground text-xs">
-          since {app.startedAt ? relTime(app.startedAt) : '—'}
-        </p>
-      </Card.Header>
-    </Card.Root>
-    <Card.Root class="py-4">
-      <Card.Header class="px-4">
-        <Card.Description class="text-[11px] font-semibold tracking-wide uppercase">Restarts</Card.Description>
-        <Card.Title class="tabular text-2xl">{num(app.restarts)}</Card.Title>
-        <p class="text-muted-foreground text-xs">{num(app.unstableRestarts)} unstable</p>
-      </Card.Header>
-    </Card.Root>
+<div class="flex flex-1 flex-col gap-3.5 p-5 pt-3.5 md:p-6 md:pt-3.5">
+  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {#each TILES as t (t.label)}
+      <div class="panel-raised rounded-2xl p-4">
+        <p class="eyebrow">{t.label}</p>
+        <p class="tabular mt-1 text-[27px] font-semibold">{t.value}</p>
+        <p class="text-muted-foreground mt-0.5 font-mono text-[10.5px]">{t.sub}</p>
+      </div>
+    {/each}
   </div>
 
   <Tabs.Root value="logs">
@@ -157,7 +170,7 @@
 
     <Tabs.Content value="logs">
       <Card.Root class="gap-0 py-0">
-        <Card.Header class="flex-row flex-wrap items-center gap-3 border-b py-3">
+        <Card.Header class="border-border flex-row flex-wrap items-center gap-3 border-b py-3.5">
           <Card.Title class="text-base">Output</Card.Title>
           <Badge
             variant="outline"
