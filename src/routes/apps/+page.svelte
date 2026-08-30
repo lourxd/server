@@ -88,6 +88,10 @@
   let localRepo = $state('');
   let installDeps = $state(true);
 
+  let runBuild = $state(true);
+  let building = $state(false);
+  let buildLines = $state([]);
+
   let importing = $state(false);
   let importLines = $state([]);
   let importFilter = $state('');
@@ -141,6 +145,8 @@
     localRepo = '';
     imported = null;
     importLines = [];
+    buildLines = [];
+    runBuild = true;
     source = data.repos.length ? 'local' : data.github.connected ? 'github' : 'url';
     wizardOpen = true;
   }
@@ -247,8 +253,32 @@
   }
 
   const selectedRepo = $derived(data.repos.find((r) => r.relPath === form.cwd));
+  const buildCmd = $derived(stack?.defaults?.build ?? '');
+  const buildOutput = $derived(stack?.defaults?.buildOutput ?? '');
+
+  async function runBuildStep() {
+    building = true;
+    buildLines = [];
+    let ok = false;
+    try {
+      await streamPost(
+        '/api/repos/run',
+        { action: 'run-script', script: 'build', path: form.cwd },
+        (event, payload) => {
+          if (event === 'line') buildLines = [...buildLines, payload];
+          if (event === 'done') ok = payload.ok;
+        },
+      );
+    } catch (err) {
+      buildLines = [...buildLines, { stream: 'err', line: err.message }];
+    }
+    building = false;
+    if (!ok) toasts.error('Build failed', 'The app was not started — see the build output.');
+    return ok;
+  }
 
   async function deploy() {
+    if (runBuild && buildCmd && !(await runBuildStep())) return;
     try {
       const payload = { action: 'start', ...form, stack: stackId };
       if (isStatic) {
@@ -256,6 +286,7 @@
       }
       await api('/api/apps', payload);
       toasts.ok('App deployed', form.name || form.script || form.serveDir);
+      buildLines = [];
       wizardOpen = false;
     } catch {
     }
@@ -704,6 +735,35 @@
           </Button>
         </div>
 
+        {#if buildCmd}
+          <div class="panel space-y-3 rounded-xl p-3.5">
+            <div class="flex items-start gap-2.5">
+              <Checkbox id="run-build" bind:checked={runBuild} disabled={building} />
+              <div class="min-w-0 flex-1">
+                <Label for="run-build" class="font-normal">
+                  Run <code class="font-mono text-[11.5px]">{buildCmd}</code> before starting
+                </Label>
+                {#if buildOutput}
+                  <p class="text-muted-foreground mt-1 text-[11.5px]">
+                    {stack.name} needs a production build in
+                    <code class="font-mono">{buildOutput}</code>. Without one the process exits on
+                    startup and PM2 restarts it until it gives up.
+                  </p>
+                {/if}
+              </div>
+            </div>
+
+            {#if building || buildLines.length}
+              <LogStream lines={buildLines} height="30vh" />
+            {/if}
+            {#if building}
+              <p class="text-muted-foreground flex items-center gap-2 text-xs">
+                <LoaderCircle class="size-3.5 animate-spin" /> Building…
+              </p>
+            {/if}
+          </div>
+        {/if}
+
         {#if mismatch}
           <Alert.Root>
             <TriangleAlert class="size-4" />
@@ -853,13 +913,20 @@
           </Button>
         {/if}
       {:else}
-        <Button variant="outline" onclick={() => (step = 2)}><ArrowLeft class="size-4" /> Back</Button>
+        <Button variant="outline" disabled={building} onclick={() => (step = 2)}>
+          <ArrowLeft class="size-4" /> Back
+        </Button>
         <Button
           class="accent-fill rounded-xl px-4 font-semibold"
-          disabled={isStatic ? !form.serveDir : !form.script}
+          disabled={building || (isStatic ? !form.serveDir : !form.script)}
           onclick={deploy}
         >
-          <Check class="size-4" /> Deploy
+          {#if building}
+            <LoaderCircle class="size-4 animate-spin" /> Building…
+          {:else}
+            <Check class="size-4" />
+            {runBuild && buildCmd ? 'Build & deploy' : 'Deploy'}
+          {/if}
         </Button>
       {/if}
     </Dialog.Footer>

@@ -1,11 +1,19 @@
 import { spawn } from 'node:child_process';
 
+function childEnv(env) {
+  const merged = { ...process.env, ...env };
+  for (const [key, value] of Object.entries(merged)) {
+    if (value == null) delete merged[key];
+  }
+  return merged;
+}
+
 export function run(cmd, args = [], opts = {}) {
   const { cwd, env, timeout = 120_000, input, maxBuffer = 8 * 1024 * 1024 } = opts;
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(cmd, args, { cwd, env: { ...process.env, ...env }, shell: false });
+      child = spawn(cmd, args, { cwd, env: childEnv(env), shell: false });
     } catch (err) {
       return resolve({ ok: false, code: -1, stdout: '', stderr: err.message, cmd: `${cmd} ${args.join(' ')}` });
     }
@@ -43,7 +51,7 @@ export function runStreaming(cmd, args = [], opts = {}, onLine = () => {}) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(cmd, args, { cwd, env: { ...process.env, ...env }, shell: false });
+      child = spawn(cmd, args, { cwd, env: childEnv(env), shell: false });
     } catch (err) {
       onLine({ stream: 'err', line: err.message });
       return resolve({ ok: false, code: -1 });

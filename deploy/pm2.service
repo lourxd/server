@@ -1,0 +1,30 @@
+[Unit]
+Description=PM2 process manager
+Documentation=https://pm2.keymetrics.io/
+# Owns the PM2 daemon so it lives in its own cgroup. When the panel spawned the
+# daemon itself, every `systemctl restart control-panel` SIGKILLed the whole
+# cgroup and took every deployed app down with it.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# oneshot, not forking: the daemon detaches itself and must outlive this unit's
+# start job. RemainAfterExit keeps the unit active so ExecStop still applies.
+Type=oneshot
+RemainAfterExit=yes
+User=__USER__
+Group=__GROUP__
+Environment=PM2_HOME=__PM2_HOME__
+# pm2's shebang is `env node`, and a unit does not inherit an nvm PATH.
+Environment=PATH=__NODE_BIN_DIR__:/usr/local/bin:/usr/bin:/bin
+# resurrect restores whatever `pm2 save` last wrote, so apps come back on boot.
+ExecStart=__PM2__ resurrect
+ExecReload=__PM2__ reload all
+ExecStop=__PM2__ kill
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pm2
+
+[Install]
+WantedBy=multi-user.target

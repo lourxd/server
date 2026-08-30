@@ -290,6 +290,28 @@ internally. Grep the whole tree, `ui/` included.
 was called by `realtime.js` but not exported from `pm2.js`; the build succeeded
 and shutdown would have thrown.
 
+**systemd's default `KillMode=control-group` killed every deployed app.** The
+panel called `pm2.connect()`, which spawns a PM2 daemon when none exists — as a
+child of the panel, so inside the panel's cgroup. Every `systemctl restart
+control-panel` then SIGKILLed the whole cgroup: daemon, apps, everything, with
+no error anywhere. Apps simply vanished from `pm2 list`. Two fixes, both needed:
+`KillMode=process` on the panel's unit, and a separate `pm2.service` that owns
+the daemon and runs `pm2 resurrect` so apps also come back after a reboot.
+`pm2.disconnect()` is innocent — it only closes the RPC and bus sockets.
+
+**`NODE_ENV=production` leaks into every child process.** `exec.js` spreads
+`process.env`, and the panel's unit sets `NODE_ENV=production` for itself. `npm
+install` then omits devDependencies, so a Next/Vite/TS project installs a tree
+that cannot build — `Cannot find module '@tailwindcss/postcss'` and friends. The
+install action now unsets `NODE_ENV` for the child (pass `null` in `env` and
+`childEnv()` deletes the key) and passes `--include=dev` for npm.
+
+**A failed Next.js build poisons the next one.** Turbopack leaves partial chunks
+in `.next`, and the retry fails with the identical error even after the real
+cause is fixed. `rm -rf .next` before rebuilding. The panel does not do this
+automatically — deleting a user's build output on their behalf is not ours to
+decide.
+
 **Rebuilding in place kills the running panel.** `adapter-node` serves static
 assets through sirv, which caches the file manifest at boot; `npm run build`
 replaces those hashed files underneath it, and the next request for an old chunk

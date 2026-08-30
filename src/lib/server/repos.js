@@ -351,8 +351,14 @@ export async function gitAction(relPath, action, payload = {}, onLine = () => {}
     case 'install': {
       const pm = detectPackageManager(dir);
       if (!pm) throw new Error('No package.json found in this repository.');
-      emit({ stream: 'out', line: `$ ${pm} install` });
-      return runStreaming(pm, ['install'], { ...opts, timeout: 900_000 }, emit);
+      const args = pm === 'npm' ? ['install', '--include=dev'] : ['install'];
+      emit({ stream: 'out', line: `$ ${pm} ${args.join(' ')}` });
+      return runStreaming(
+        pm,
+        args,
+        { ...opts, timeout: 900_000, env: { ...opts.env, NODE_ENV: null } },
+        emit,
+      );
     }
 
     case 'run-script': {

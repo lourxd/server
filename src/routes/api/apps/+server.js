@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import * as pm2 from '$srv/pm2.js';
 import { safeRepoPath } from '$srv/repos.js';
+import { STACK_BY_ID } from '$lib/stacks.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -92,6 +93,9 @@ async function startProcess(body) {
       exec_mode: 'fork',
       autorestart: body.autorestart !== false,
       max_memory_restart: body.maxMemory || undefined,
+      min_uptime: 5000,
+      max_restarts: 10,
+      restart_delay: 1000,
       time: true,
       env: {
         ...env,
@@ -101,6 +105,14 @@ async function startProcess(body) {
         PM2_SERVE_HOST: body.serve.host ?? '0.0.0.0',
       },
     });
+  }
+
+  const buildOutput = STACK_BY_ID[body.stack]?.defaults?.buildOutput;
+  if (buildOutput && !fs.existsSync(path.join(cwd, buildOutput))) {
+    error(
+      400,
+      `No build output at ${path.join(cwd, buildOutput)}. Run the build step before starting, or the process will exit immediately and restart until PM2 gives up.`,
+    );
   }
 
   const script = String(body.script || '').trim();
@@ -127,6 +139,9 @@ async function startProcess(body) {
     watch: !!body.watch,
     autorestart: body.autorestart !== false,
     max_memory_restart: body.maxMemory || undefined,
+    min_uptime: 5000,
+    max_restarts: 10,
+    restart_delay: 1000,
     interpreter,
     env: Object.keys(env).length ? env : undefined,
     time: true,

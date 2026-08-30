@@ -170,7 +170,17 @@ chown -R "$TARGET_USER:$TARGET_GROUP" "$INSTALL_DIR"
 
 # ----------------------------------------------------------------- service ---
 
-step "Installing systemd service"
+step "Installing systemd units"
+
+PM2_BIN="$INSTALL_DIR/node_modules/.bin/pm2"
+PM2_UNIT="/etc/systemd/system/pm2.service"
+sed -e "s|__USER__|$TARGET_USER|g" \
+    -e "s|__GROUP__|$TARGET_GROUP|g" \
+    -e "s|__PM2_HOME__|$TARGET_HOME/.pm2|g" \
+    -e "s|__NODE_BIN_DIR__|$(dirname "$NODE_BIN")|g" \
+    -e "s|__PM2__|$PM2_BIN|g" \
+    "$INSTALL_DIR/deploy/pm2.service" > "$PM2_UNIT"
+
 UNIT="/etc/systemd/system/${SERVICE_NAME}.service"
 sed -e "s|__USER__|$TARGET_USER|g" \
     -e "s|__GROUP__|$TARGET_GROUP|g" \
@@ -179,9 +189,13 @@ sed -e "s|__USER__|$TARGET_USER|g" \
     "$INSTALL_DIR/deploy/control-panel.service" > "$UNIT"
 
 systemctl daemon-reload
+# The daemon must exist before the panel connects, or the panel spawns one into
+# its own cgroup and loses every app on the next restart.
+systemctl enable pm2 >/dev/null 2>&1
+systemctl start pm2 || warn "pm2.service did not start; apps will not resurrect on boot."
 systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
 systemctl restart "$SERVICE_NAME"
-ok "Service ${SERVICE_NAME} enabled and started"
+ok "Services pm2 and ${SERVICE_NAME} enabled and started"
 
 # ------------------------------------------------------------------- verify --
 

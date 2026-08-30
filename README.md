@@ -131,6 +131,18 @@ The service reads `.env` in the install directory (see `.env.example`):
 > Migration SQL is read from disk at runtime and `adapter-node` does **not** copy
 > it into `build/`, so keep the source tree beside the build.
 
+### Two systemd units
+
+`pm2.service` owns the PM2 daemon; `control-panel.service` is the panel. They
+are separate on purpose: if the panel spawns the daemon itself, the daemon lands
+in the panel's cgroup and systemd's default `KillMode=control-group` takes every
+deployed app down on each panel restart. The panel's unit also sets
+`KillMode=process` so it can only ever kill itself.
+
+`pm2.service` runs `pm2 resurrect` on boot, so whatever `pm2 save` last recorded
+comes back after a reboot. Uninstalling the panel leaves `pm2.service` in place —
+removing the panel should not take your sites offline.
+
 ### Not managed by PM2 — deliberately
 
 The panel runs under **systemd**, never PM2. It manages PM2, so being supervised
