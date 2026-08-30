@@ -44,6 +44,7 @@
   let cloneBranch = $state('');
 
   let running = $state(false);
+  let failed = $state(false);
   let lines = $state([]);
   let title = $state('');
 
@@ -84,6 +85,7 @@
 
   async function stream(label, body) {
     running = true;
+    failed = false;
     title = label;
     lines = [];
     let ok = false;
@@ -96,6 +98,7 @@
       lines = [...lines, { stream: 'err', line: err.message }];
     }
     running = false;
+    failed = !ok;
     if (ok) {
       toasts.ok(`${label} finished`);
       await invalidateAll();
@@ -307,7 +310,7 @@
           Clear
         </Button>
       </div>
-      <LogStream {lines} height="320px" />
+      <LogStream {lines} {failed} height="320px" />
     </div>
   {/if}
 </div>
@@ -395,7 +398,7 @@
     </Tabs.Root>
 
     {#if lines.length}
-      <LogStream {lines} height="224px" />
+      <LogStream {lines} {failed} height="224px" />
     {/if}
 
     <Dialog.Footer>
