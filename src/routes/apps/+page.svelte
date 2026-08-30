@@ -1,0 +1,826 @@
+<script>
+  import { live, api, apiGet, streamPost, toasts } from '$lib/live.svelte.js';
+  import { bytes, duration, num, relTime } from '$lib/format.js';
+  import { cn } from '$lib/utils.js';
+  import { STACKS, STACK_BY_ID, detectStack } from '$lib/stacks.js';
+  import { invalidateAll } from '$app/navigation';
+
+  import * as Card from '$lib/components/ui/card/index.js';
+  import * as Table from '$lib/components/ui/table/index.js';
+  import * as Dialog from '$lib/components/ui/dialog/index.js';
+  import * as Select from '$lib/components/ui/select/index.js';
+  import * as Alert from '$lib/components/ui/alert/index.js';
+  import * as Tabs from '$lib/components/ui/tabs/index.js';
+  import { Button } from '$lib/components/ui/button/index.js';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
+  import { Textarea } from '$lib/components/ui/textarea/index.js';
+  import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+  import { Badge } from '$lib/components/ui/badge/index.js';
+  import { Separator } from '$lib/components/ui/separator/index.js';
+
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import StatusBadge from '$lib/components/StatusBadge.svelte';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import TechLogo from '$lib/components/TechLogo.svelte';
+  import LogStream from '$lib/components/LogStream.svelte';
+
+  import Plus from '@lucide/svelte/icons/plus';
+  import RotateCw from '@lucide/svelte/icons/rotate-cw';
+  import Square from '@lucide/svelte/icons/square';
+  import Play from '@lucide/svelte/icons/play';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Save from '@lucide/svelte/icons/save';
+  import Search from '@lucide/svelte/icons/search';
+  import Boxes from '@lucide/svelte/icons/boxes';
+  import RefreshCcw from '@lucide/svelte/icons/refresh-ccw';
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import Check from '@lucide/svelte/icons/check';
+  import GitFork from '@lucide/svelte/icons/git-fork';
+  import Link from '@lucide/svelte/icons/link';
+  import FolderOpen from '@lucide/svelte/icons/folder-open';
+  import CloudDownload from '@lucide/svelte/icons/cloud-download';
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
+
+  let { data } = $props();
+
+  let filter = $state('');
+  let busy = $state(new Set());
+  let confirmOpen = $state(false);
+  let confirmState = $state({ title: '', description: '', label: '', action: null });
+
+  let wizardOpen = $state(false);
+  let step = $state(1);
+  let stackId = $state(null);
+
+  let source = $state('github');
+  let ghRepos = $state([]);
+  let ghLoading = $state(false);
+  let ghFilter = $state('');
+  let ghPicked = $state(null);
+  let cloneUrl = $state('');
+  let cloneBranch = $state('');
+  let localRepo = $state('');
+  let installDeps = $state(true);
+
+  let importing = $state(false);
+  let importLines = $state([]);
+  let importFilter = $state('');
+  let imported = $state(null);
+
+  let form = $state({
+    cwd: '',
+    script: '',
+    name: '',
+    args: '',
+    instances: 1,
+    execMode: 'fork',
+    watch: false,
+    autorestart: true,
+    maxMemory: '',
+    env: '',
+    interpreter: '',
+    serveDir: '',
+    servePort: 5000,
+    serveSpa: true,
+  });
+
+  const stack = $derived(stackId ? STACK_BY_ID[stackId] : null);
+  const isStatic = $derived(!!stack?.serve);
+  const canCluster = $derived(stack?.clusterable !== false);
+
+  const detected = $derived(imported?.pkg ? detectStack(imported.pkg) : null);
+  const mismatch = $derived(detected && stackId && detected !== stackId);
+
+  const ghShown = $derived(
+    ghFilter ? ghRepos.filter((r) => r.fullName.toLowerCase().includes(ghFilter.toLowerCase())) : ghRepos,
+  );
+
+  function openWizard() {
+    step = 1;
+    stackId = null;
+    ghPicked = null;
+    cloneUrl = '';
+    cloneBranch = '';
+    localRepo = '';
+    imported = null;
+    importLines = [];
+    source = data.github.connected ? 'github' : 'url';
+    wizardOpen = true;
+  }
+
+  function chooseStack(id) {
+    stackId = id;
+    step = 2;
+    if (source === 'github' && data.github.connected && !ghRepos.length) loadGithub();
+  }
+
+  async function loadGithub() {
+    ghLoading = true;
+    try {
+      ghRepos = await apiGet('/api/repos', { source: 'github' }, { quiet: true });
+    } catch (err) {
+      toasts.error('Could not list your repositories', err.message);
+    } finally {
+      ghLoading = false;
+    }
+  }
+
+  function applyStackDefaults(relPath, pkg) {
+    const d = stack.defaults;
+    form = {
+      ...form,
+      cwd: relPath,
+      name: form.name || relPath.split('/').pop(),
+      script: d.script,
+      args: d.args ?? '',
+      execMode: d.execMode ?? 'fork',
+      instances: d.execMode === 'cluster' ? 2 : 1,
+      env: [d.env, d.port && !stack.serve ? `PORT=${d.port}` : ''].filter(Boolean).join('\n'),
+      interpreter: d.interpreter ?? '',
+      serveDir: stack.serve?.dir ?? '',
+      servePort: d.port ?? 5000,
+      serveSpa: stack.serve?.spa ?? true,
+    };
+  }
+
+  async function runImport() {
+    const url = source === 'github' ? ghPicked?.cloneUrl : cloneUrl.trim();
+    const name = source === 'github' ? ghPicked?.name : undefined;
+    if (!url) return;
+
+    importing = true;
+    importLines = [];
+    let ok = false;
+    let relPath = null;
+
+    try {
+      await streamPost(
+        '/api/repos/run',
+        { action: 'clone', url, name, branch: cloneBranch || undefined },
+        (event, payload) => {
+          if (event === 'line') importLines = [...importLines, payload];
+          else if (event === 'done') {
+            ok = payload.ok;
+            relPath = payload.name ?? null;
+          }
+        },
+      );
+
+      if (ok && installDeps) {
+        importLines = [...importLines, { stream: 'out', line: '' }];
+        await streamPost('/api/repos/run', { action: 'install', path: relPath }, (event, payload) => {
+          if (event === 'line') importLines = [...importLines, payload];
+          else if (event === 'done') ok = payload.ok;
+        });
+      }
+    } catch (err) {
+      importLines = [...importLines, { stream: 'err', line: err.message }];
+      ok = false;
+    } finally {
+      importing = false;
+    }
+
+    if (!ok || !relPath) {
+      toasts.error('Import failed', 'See the output for details.');
+      return;
+    }
+
+    await invalidateAll();
+    const repo = data.repos.find((r) => r.relPath === relPath);
+    imported = { relPath, pkg: repo?.pkg ?? null };
+    applyStackDefaults(relPath, imported.pkg);
+    toasts.ok('Repository imported', relPath);
+    step = 3;
+  }
+
+  function useLocal() {
+    if (!localRepo) return;
+    const repo = data.repos.find((r) => r.relPath === localRepo);
+    imported = { relPath: localRepo, pkg: repo?.pkg ?? null };
+    applyStackDefaults(localRepo, imported.pkg);
+    step = 3;
+  }
+
+  const selectedRepo = $derived(data.repos.find((r) => r.relPath === form.cwd));
+
+  async function deploy() {
+    try {
+      const payload = { action: 'start', ...form, stack: stackId };
+      if (isStatic) {
+        payload.serve = { dir: form.serveDir, port: Number(form.servePort), spa: form.serveSpa };
+      }
+      await api('/api/apps', payload);
+      toasts.ok('App deployed', form.name || form.script || form.serveDir);
+      wizardOpen = false;
+    } catch {
+    }
+  }
+
+  async function startFromEcosystem() {
+    await api('/api/apps', { action: 'start', cwd: form.cwd, ecosystem: selectedRepo.ecosystemFile });
+    toasts.ok('Started from ecosystem file', selectedRepo.ecosystemFile);
+    wizardOpen = false;
+  }
+
+  const shown = $derived(
+    filter
+      ? live.apps.filter(
+          (a) => a.name?.toLowerCase().includes(filter.toLowerCase()) || String(a.pmId) === filter,
+        )
+      : live.apps,
+  );
+
+  function setBusy(id, on) {
+    const next = new Set(busy);
+    on ? next.add(id) : next.delete(id);
+    busy = next;
+  }
+
+  async function act(app, action) {
+    setBusy(app.pmId, true);
+    try {
+      await api('/api/apps', { action, id: app.pmId });
+      toasts.ok(`${app.name} ${action}ed`);
+    } catch {
+    } finally {
+      setBusy(app.pmId, false);
+    }
+  }
+
+  function askDelete(app) {
+    confirmState = {
+      title: `Delete ${app.name}?`,
+      description: `This removes "${app.name}" from PM2 entirely. Files on disk are untouched, but the app stops and disappears from this list.`,
+      label: 'Delete app',
+      action: async () => {
+        await api('/api/apps', { action: 'delete', id: app.pmId });
+        toasts.ok('App deleted', app.name);
+      },
+    };
+    confirmOpen = true;
+  }
+
+  function askBulk(action) {
+    const stopping = action === 'stopAll';
+    confirmState = {
+      title: stopping ? 'Stop every app?' : 'Restart every app?',
+      description: `This applies to all ${live.apps.length} apps managed on this machine, including this control panel if it is one of them.`,
+      label: stopping ? 'Stop all' : 'Restart all',
+      action: async () => {
+        const res = await api('/api/apps', { action });
+        const failed = res.results?.filter((r) => !r.ok) ?? [];
+        failed.length
+          ? toasts.error(`${failed.length} failed`, failed.map((f) => f.name).join(', '))
+          : toasts.ok('Done', `${res.results.length} apps updated.`);
+      },
+    };
+    confirmOpen = true;
+  }
+
+  async function save() {
+    await api('/api/apps', { action: 'save' });
+    toasts.ok('App list saved', 'PM2 will resurrect these on boot.');
+  }
+</script>
+
+<svelte:head><title>Apps · {data.host?.hostname}</title></svelte:head>
+
+<PageHeader title="Apps">
+  {#snippet children()}
+    <Badge variant="outline" class={live.errored ? 'border-bad/40 text-bad' : 'border-ok/40 text-ok'}>
+      {live.online} online / {live.apps.length}
+    </Badge>
+  {/snippet}
+  {#snippet actions()}
+    <div class="relative">
+      <Search class="text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 size-3.5" />
+      <Input placeholder="Filter apps…" bind:value={filter} class="h-9 w-44 pl-8" />
+    </div>
+    <Button size="sm" onclick={openWizard}><Plus class="size-4" /> New app</Button>
+  {/snippet}
+</PageHeader>
+
+<div class="flex-1 space-y-4 p-5">
+  <div class="flex flex-wrap items-center gap-2">
+    <Button variant="outline" size="sm" disabled={!live.apps.length} onclick={() => askBulk('restartAll')}>
+      <RefreshCcw class="size-3.5" /> Restart all
+    </Button>
+    <Button variant="outline" size="sm" disabled={!live.online} onclick={() => askBulk('stopAll')}>
+      <Square class="size-3.5" /> Stop all
+    </Button>
+    <Button variant="outline" size="sm" disabled={!live.apps.length} onclick={save}>
+      <Save class="size-3.5" /> Save list
+    </Button>
+    <p class="text-muted-foreground tabular ml-auto text-xs">
+      {live.totalCpu.toFixed(1)}% CPU · {bytes(live.totalMem)} RAM
+    </p>
+  </div>
+
+  <Card.Root class="overflow-hidden py-0">
+    {#if !live.apps.length}
+      <div class="flex flex-col items-center gap-3 px-6 py-16 text-center">
+        <div class="bg-muted grid size-11 place-items-center rounded-full">
+          <Boxes class="text-muted-foreground size-5" />
+        </div>
+        <div>
+          <h3 class="font-medium">No apps deployed yet</h3>
+          <p class="text-muted-foreground mt-1 text-sm">
+            Pick a stack and deploy — Next.js, SvelteKit, Express and more.
+          </p>
+        </div>
+        <Button size="sm" onclick={openWizard}><Plus class="size-4" /> New app</Button>
+      </div>
+    {:else}
+      <Table.Root>
+        <Table.Header>
+          <Table.Row class="hover:bg-transparent">
+            <Table.Head class="w-12 text-right">id</Table.Head>
+            <Table.Head>Name</Table.Head>
+            <Table.Head class="w-28">Status</Table.Head>
+            <Table.Head class="w-20 text-right">CPU</Table.Head>
+            <Table.Head class="w-24 text-right">Memory</Table.Head>
+            <Table.Head class="w-24 text-right">Uptime</Table.Head>
+            <Table.Head class="w-16 text-right">↺</Table.Head>
+            <Table.Head class="w-24">Mode</Table.Head>
+            <Table.Head class="w-56"></Table.Head>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {#each shown as app (app.pmId)}
+            <Table.Row>
+              <Table.Cell class="text-muted-foreground tabular text-right text-xs">{app.pmId}</Table.Cell>
+              <Table.Cell>
+                <div class="flex items-center gap-2">
+                  {#if app.stack && STACK_BY_ID[app.stack]}
+                    <TechLogo name={STACK_BY_ID[app.stack].logo} class="text-muted-foreground size-4 shrink-0" />
+                  {/if}
+                  <a href="/apps/{app.pmId}" class="font-medium hover:underline">{app.name}</a>
+                </div>
+                <p class="text-muted-foreground max-w-[22rem] truncate text-xs" title={app.script}>
+                  {app.script ?? ''}
+                </p>
+              </Table.Cell>
+              <Table.Cell><StatusBadge status={app.status} /></Table.Cell>
+              <Table.Cell class="tabular text-right">{app.cpu}%</Table.Cell>
+              <Table.Cell class="tabular text-right">{bytes(app.memory)}</Table.Cell>
+              <Table.Cell class="tabular text-right whitespace-nowrap">
+                {app.status === 'online' ? duration(app.uptime) : '—'}
+              </Table.Cell>
+              <Table.Cell class={cn('tabular text-right', !app.restarts && 'text-muted-foreground')}>
+                {num(app.restarts)}
+              </Table.Cell>
+              <Table.Cell class="text-muted-foreground text-xs">
+                {app.execMode}{app.instances > 1 ? ` ×${app.instances}` : ''}
+              </Table.Cell>
+              <Table.Cell>
+                <div class="flex justify-end gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="h-7 px-2"
+                    disabled={busy.has(app.pmId)}
+                    onclick={() => act(app, 'restart')}
+                  >
+                    <RotateCw class="size-3.5" />
+                  </Button>
+                  {#if app.status === 'online'}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      class="h-7 px-2"
+                      disabled={busy.has(app.pmId)}
+                      onclick={() => act(app, 'stop')}
+                    >
+                      <Square class="size-3.5" />
+                    </Button>
+                  {:else}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      class="h-7 px-2"
+                      disabled={busy.has(app.pmId)}
+                      onclick={() => act(app, 'restart')}
+                    >
+                      <Play class="size-3.5" />
+                    </Button>
+                  {/if}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="text-bad hover:text-bad hover:bg-bad/10 h-7 px-2"
+                    disabled={busy.has(app.pmId)}
+                    onclick={() => askDelete(app)}
+                  >
+                    <Trash2 class="size-3.5" />
+                  </Button>
+                </div>
+              </Table.Cell>
+            </Table.Row>
+          {/each}
+          {#if !shown.length}
+            <Table.Row>
+              <Table.Cell colspan={9} class="text-muted-foreground py-10 text-center">
+                No app matches “{filter}”.
+              </Table.Cell>
+            </Table.Row>
+          {/if}
+        </Table.Body>
+      </Table.Root>
+    {/if}
+  </Card.Root>
+</div>
+
+<Dialog.Root bind:open={wizardOpen}>
+  <Dialog.Content class={cn('max-h-[88vh] overflow-y-auto', step === 1 ? 'sm:max-w-2xl' : 'sm:max-w-xl')}>
+    <Dialog.Header>
+      <Dialog.Title>
+        {#if step === 1}What are you deploying?
+        {:else if step === 2}Import {stack?.name} project
+        {:else}Configure {stack?.name}{/if}
+      </Dialog.Title>
+      <Dialog.Description>
+        {#if step === 1}Pick a stack and the sensible defaults are filled in for you.
+        {:else if step === 2}Bring in the code from GitHub, any git URL, or a project already on this server.
+        {:else}{stack?.summary}{/if}
+      </Dialog.Description>
+    </Dialog.Header>
+
+        <div class="text-muted-foreground flex items-center gap-1.5 text-xs">
+      {#each ['Stack', 'Source', 'Configure'] as label, i (label)}
+        {@const n = i + 1}
+        <span class={cn('flex items-center gap-1.5', step >= n && 'text-foreground font-medium')}>
+          <span
+            class={cn(
+              'grid size-4 place-items-center rounded-full text-[10px]',
+              step > n ? 'bg-ok text-white' : step === n ? 'bg-primary text-primary-foreground' : 'bg-muted',
+            )}
+          >
+            {#if step > n}<Check class="size-2.5" />{:else}{n}{/if}
+          </span>
+          {label}
+        </span>
+        {#if n < 3}<span class="bg-border h-px w-4"></span>{/if}
+      {/each}
+    </div>
+
+    {#if step === 1}
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {#each STACKS as s (s.id)}
+          <button
+            type="button"
+            onclick={() => chooseStack(s.id)}
+            class="hover:border-primary/60 hover:bg-accent focus-visible:ring-ring group flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <TechLogo name={s.logo} class="size-7 transition-transform group-hover:scale-110" />
+            <div class="min-w-0">
+              <p class="text-sm font-medium">{s.name}</p>
+              <p class="text-muted-foreground line-clamp-2 text-xs">{s.summary}</p>
+            </div>
+          </button>
+        {/each}
+      </div>
+
+    {:else if step === 2}
+      <div class="space-y-4">
+        <div class="bg-muted/50 flex items-center gap-3 rounded-lg border p-3">
+          <TechLogo name={stack.logo} class="size-6" />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium">{stack.name}</p>
+            <p class="text-muted-foreground truncate text-xs">{stack.summary}</p>
+          </div>
+          <Button variant="ghost" size="sm" class="h-7" onclick={() => (step = 1)}>
+            <ArrowLeft class="size-3.5" /> Change
+          </Button>
+        </div>
+
+        {#if importing || importLines.length}
+          <LogStream lines={importLines} bind:filter={importFilter} height="38vh" />
+          {#if importing}
+            <p class="text-muted-foreground flex items-center gap-2 text-xs">
+              <LoaderCircle class="size-3.5 animate-spin" /> Importing — cloning{installDeps
+                ? ' and installing dependencies'
+                : ''}…
+            </p>
+          {/if}
+        {:else}
+          <Tabs.Root bind:value={source}>
+            <Tabs.List class="w-full">
+              <Tabs.Trigger value="github" class="flex-1 gap-1.5">
+                <GitFork class="size-3.5" /> GitHub
+              </Tabs.Trigger>
+              <Tabs.Trigger value="url" class="flex-1 gap-1.5"><Link class="size-3.5" /> Git URL</Tabs.Trigger>
+              <Tabs.Trigger value="local" class="flex-1 gap-1.5">
+                <FolderOpen class="size-3.5" /> On server
+              </Tabs.Trigger>
+            </Tabs.List>
+
+                        <Tabs.Content value="github" class="space-y-3 pt-3">
+              {#if !data.github.connected}
+                <Alert.Root>
+                  <TriangleAlert class="size-4" />
+                  <Alert.Description class="space-y-2 text-xs">
+                    <p>
+                      GitHub is not connected, so your repositories cannot be listed. Add a personal
+                      access token, or paste a git URL on the next tab.
+                    </p>
+                    <Button variant="outline" size="sm" class="h-7" href="/settings?tab=github">
+                      Connect GitHub
+                    </Button>
+                  </Alert.Description>
+                </Alert.Root>
+              {:else}
+                <div class="relative">
+                  <Search class="text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 size-3.5" />
+                  <Input placeholder="Search your repositories…" bind:value={ghFilter} class="pl-8" />
+                </div>
+
+                <div class="max-h-64 space-y-1 overflow-auto rounded-md border p-1">
+                  {#if ghLoading}
+                    <p class="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
+                      <LoaderCircle class="size-4 animate-spin" /> Loading repositories…
+                    </p>
+                  {:else if !ghShown.length}
+                    <p class="text-muted-foreground py-10 text-center text-sm">
+                      {ghRepos.length ? 'No repository matches that search.' : 'No repositories returned.'}
+                    </p>
+                  {:else}
+                    {#each ghShown as r (r.id)}
+                      {@const already = data.repos.some((x) => x.relPath === r.name)}
+                      <button
+                        type="button"
+                        disabled={already}
+                        onclick={() => (ghPicked = r)}
+                        class={cn(
+                          'flex w-full items-start gap-2.5 rounded-md p-2 text-left transition-colors',
+                          ghPicked?.id === r.id ? 'bg-accent ring-primary/40 ring-1' : 'hover:bg-accent/60',
+                          already && 'cursor-not-allowed opacity-50',
+                        )}
+                      >
+                        <GitFork class="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-1.5">
+                            <span class="truncate text-sm font-medium">{r.fullName}</span>
+                            {#if r.private}
+                              <Badge variant="outline" class="border-warn/40 text-warn text-[10px]">private</Badge>
+                            {/if}
+                            {#if already}
+                              <Badge variant="outline" class="text-[10px]">imported</Badge>
+                            {/if}
+                          </div>
+                          {#if r.description}
+                            <p class="text-muted-foreground truncate text-xs">{r.description}</p>
+                          {/if}
+                          <p class="text-muted-foreground text-[11px]">
+                            {r.language ?? '—'} · {r.defaultBranch} · {relTime(r.updatedAt)}
+                          </p>
+                        </div>
+                        {#if ghPicked?.id === r.id}<Check class="text-ok mt-0.5 size-4 shrink-0" />{/if}
+                      </button>
+                    {/each}
+                  {/if}
+                </div>
+
+                {#if ghPicked}
+                  <div class="space-y-2">
+                    <Label for="gh-branch">Branch <span class="text-muted-foreground">(optional)</span></Label>
+                    <Input id="gh-branch" bind:value={cloneBranch} placeholder={ghPicked.defaultBranch} />
+                  </div>
+                {/if}
+              {/if}
+            </Tabs.Content>
+
+                        <Tabs.Content value="url" class="space-y-3 pt-3">
+              <div class="space-y-2">
+                <Label for="clone-url">Repository URL</Label>
+                <Input id="clone-url" bind:value={cloneUrl} placeholder="https://github.com/owner/repo.git" />
+                <p class="text-muted-foreground text-xs">
+                  HTTPS or <code class="font-mono">git@</code> SSH. Private HTTPS clones use the token from
+                  Settings.
+                </p>
+              </div>
+              <div class="space-y-2">
+                <Label for="url-branch">Branch <span class="text-muted-foreground">(optional)</span></Label>
+                <Input id="url-branch" bind:value={cloneBranch} placeholder="default branch" />
+              </div>
+            </Tabs.Content>
+
+                        <Tabs.Content value="local" class="space-y-3 pt-3">
+              {#if !data.repos.length}
+                <p class="text-muted-foreground py-8 text-center text-sm">
+                  No projects on this server yet. Import one from GitHub or a git URL.
+                </p>
+              {:else}
+                <div class="max-h-64 space-y-1 overflow-auto rounded-md border p-1">
+                  {#each data.repos as r (r.relPath)}
+                    <button
+                      type="button"
+                      onclick={() => (localRepo = r.relPath)}
+                      class={cn(
+                        'flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors',
+                        localRepo === r.relPath ? 'bg-accent ring-primary/40 ring-1' : 'hover:bg-accent/60',
+                      )}
+                    >
+                      <FolderOpen class="text-muted-foreground size-4 shrink-0" />
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium">{r.relPath}</p>
+                        <p class="text-muted-foreground text-[11px]">
+                          {r.pkg?.name ?? 'no package.json'}
+                          {#if !r.hasNodeModules && r.pkg} · dependencies not installed{/if}
+                        </p>
+                      </div>
+                      {#if localRepo === r.relPath}<Check class="text-ok size-4 shrink-0" />{/if}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </Tabs.Content>
+          </Tabs.Root>
+
+          {#if source !== 'local'}
+            <div class="flex items-center gap-2">
+              <Checkbox id="install" bind:checked={installDeps} />
+              <Label for="install" class="font-normal">Install dependencies after cloning</Label>
+            </div>
+          {/if}
+        {/if}
+      </div>
+
+    {:else}
+      <div class="space-y-4">
+        <div class="bg-muted/50 flex items-center gap-3 rounded-lg border p-3">
+          <TechLogo name={stack.logo} class="size-6" />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium">{stack.name}</p>
+            <p class="text-muted-foreground truncate font-mono text-xs">{form.cwd || 'projects root'}</p>
+          </div>
+          <Button variant="ghost" size="sm" class="h-7" onclick={() => (step = 2)}>
+            <ArrowLeft class="size-3.5" /> Source
+          </Button>
+        </div>
+
+        {#if mismatch}
+          <Alert.Root>
+            <TriangleAlert class="size-4" />
+            <Alert.Description class="text-xs">
+              This project looks like <strong>{STACK_BY_ID[detected].name}</strong>, but you picked
+              <strong>{stack.name}</strong>. Deploy anyway, or
+              <button type="button" class="underline" onclick={() => chooseStack(detected)}>
+                switch to {STACK_BY_ID[detected].name}
+              </button>.
+            </Alert.Description>
+          </Alert.Root>
+        {/if}
+
+        {#if selectedRepo?.ecosystemFile}
+          <Alert.Root>
+            <Alert.Description class="space-y-2">
+              <p class="text-xs">
+                This project has <code class="font-mono">{selectedRepo.ecosystemFile}</code>. Starting from
+                it uses the settings it declares and ignores the fields below.
+              </p>
+              <Button size="sm" class="h-7" onclick={startFromEcosystem}>
+                Use {selectedRepo.ecosystemFile}
+              </Button>
+            </Alert.Description>
+          </Alert.Root>
+        {/if}
+
+        <div class="space-y-2">
+          <Label for="app-name">App name</Label>
+          <Input id="app-name" bind:value={form.name} placeholder={form.cwd || stack.id} />
+        </div>
+
+        <Separator />
+
+        {#if isStatic}
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-2">
+              <Label for="serve-dir">Build output</Label>
+              <Input id="serve-dir" bind:value={form.serveDir} class="font-mono text-xs" />
+            </div>
+            <div class="space-y-2">
+              <Label for="serve-port">Port</Label>
+              <Input id="serve-port" type="number" bind:value={form.servePort} />
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <Checkbox id="spa" bind:checked={form.serveSpa} />
+            <Label for="spa" class="font-normal">Single-page app fallback</Label>
+          </div>
+          <Alert.Root>
+            <Alert.Description class="text-xs">
+              Served by PM2's own static server, so it is supervised like any other app. Run
+              <code class="font-mono">{stack.defaults.build}</code> first so the output exists.
+            </Alert.Description>
+          </Alert.Root>
+        {:else}
+          <div class="space-y-2">
+            <Label for="script">Entry point</Label>
+            <Input id="script" bind:value={form.script} class="font-mono text-xs" />
+            <p class="text-muted-foreground text-xs">
+              {#if stack.defaults.build}
+                Run <code class="font-mono">{stack.defaults.build}</code> in the project first — the entry
+                point is the built output.
+              {:else}
+                Path relative to the project directory.
+              {/if}
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="args">Arguments</Label>
+            <Input id="args" bind:value={form.args} class="font-mono text-xs" placeholder="none" />
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div class="space-y-2">
+              <Label>Mode</Label>
+              <Select.Root type="single" bind:value={form.execMode} disabled={!canCluster}>
+                <Select.Trigger>{form.execMode}</Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="fork">fork</Select.Item>
+                  <Select.Item value="cluster">cluster</Select.Item>
+                </Select.Content>
+              </Select.Root>
+              {#if !canCluster}
+                <p class="text-muted-foreground text-xs">
+                  Cluster forks the Node runtime, so {stack.name} runs single-process.
+                </p>
+              {/if}
+            </div>
+            <div class="space-y-2">
+              <Label for="instances">Instances</Label>
+              <Input
+                id="instances"
+                type="number"
+                min="1"
+                max="64"
+                bind:value={form.instances}
+                disabled={form.execMode !== 'cluster'}
+              />
+            </div>
+            <div class="space-y-2">
+              <Label for="maxmem">Max memory</Label>
+              <Input id="maxmem" bind:value={form.maxMemory} placeholder="512M" />
+            </div>
+          </div>
+        {/if}
+
+        <div class="space-y-2">
+          <Label for="env">Environment</Label>
+          <Textarea id="env" rows={4} bind:value={form.env} class="font-mono text-xs" />
+          <p class="text-muted-foreground text-xs">One KEY=value per line.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-5">
+          <div class="flex items-center gap-2">
+            <Checkbox id="watch" bind:checked={form.watch} />
+            <Label for="watch" class="font-normal">Restart on file change</Label>
+          </div>
+          <div class="flex items-center gap-2">
+            <Checkbox id="autorestart" bind:checked={form.autorestart} />
+            <Label for="autorestart" class="font-normal">Auto-restart on crash</Label>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <Dialog.Footer>
+      {#if step === 1}
+        <Button variant="outline" onclick={() => (wizardOpen = false)}>Cancel</Button>
+      {:else if step === 2}
+        <Button variant="outline" disabled={importing} onclick={() => (step = 1)}>
+          <ArrowLeft class="size-4" /> Back
+        </Button>
+        {#if source === 'local'}
+          <Button disabled={!localRepo} onclick={useLocal}>Continue <ArrowRight class="size-4" /></Button>
+        {:else}
+          <Button
+            disabled={importing || (source === 'github' ? !ghPicked : !cloneUrl.trim())}
+            onclick={runImport}
+          >
+            {#if importing}<LoaderCircle class="size-4 animate-spin" />{:else}<CloudDownload class="size-4" />{/if}
+            {importing ? 'Importing…' : 'Import'}
+          </Button>
+        {/if}
+      {:else}
+        <Button variant="outline" onclick={() => (step = 2)}><ArrowLeft class="size-4" /> Back</Button>
+        <Button disabled={isStatic ? !form.serveDir : !form.script} onclick={deploy}>
+          <Check class="size-4" /> Deploy
+        </Button>
+      {/if}
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
+
+<ConfirmDialog
+  bind:open={confirmOpen}
+  title={confirmState.title}
+  description={confirmState.description}
+  confirmLabel={confirmState.label}
+  destructive
+  onconfirm={confirmState.action}
+/>

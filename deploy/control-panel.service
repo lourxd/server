@@ -1,0 +1,41 @@
+[Unit]
+Description=Server Control Panel
+Documentation=https://github.com/lourxd/server
+# Deliberately NOT supervised by PM2: this panel manages PM2, so it must
+# survive `pm2 kill`, a daemon crash, and its own "stop all" action.
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=__USER__
+Group=__GROUP__
+WorkingDirectory=__INSTALL_DIR__
+ExecStart=__NODE__ __INSTALL_DIR__/build/index.js
+
+Environment=NODE_ENV=production
+EnvironmentFile=__INSTALL_DIR__/.env
+
+Restart=always
+RestartSec=3
+# The app exits on SIGTERM within a couple of seconds; do not wait 90s.
+TimeoutStopSec=10
+KillSignal=SIGTERM
+
+# Hardening. The panel legitimately needs to spawn processes and write to the
+# projects directory, so this is deliberately not a full sandbox.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=control-panel
+
+[Install]
+WantedBy=multi-user.target

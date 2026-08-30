@@ -1,0 +1,18 @@
+import { publicSettings } from '$srv/store/settings.js';
+import { DATA_DIR } from '$srv/store/index.js';
+import { githubStatus } from '$srv/repos.js';
+import { cloudflareStatus } from '$srv/cloudflare/api.js';
+import { listUsers, activeSessionCount } from '$srv/auth.js';
+import { recent } from '$srv/store/audit.js';
+
+export async function load({ locals, request }) {
+  const isAdmin = locals.user?.role === 'admin';
+  const [config, github, cloudflare, users, audit] = await Promise.all([
+    publicSettings(),
+    githubStatus(),
+    cloudflareStatus(),
+    isAdmin ? listUsers(request.headers) : [],
+    isAdmin ? recent({ limit: 50 }) : [],
+  ]);
+  return { config, github, cloudflare, users, audit, sessions: activeSessionCount(), dataDir: DATA_DIR, isAdmin };
+}
