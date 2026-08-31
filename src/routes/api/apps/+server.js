@@ -7,6 +7,8 @@ import { getConnection } from '$srv/store/connections.js';
 import { connectionUrl, defaultVarFor } from '$srv/db/provision.js';
 
 const DB_MARKER = 'SCP_DB';
+const PENDING_BUILD = 'SCP_PENDING_BUILD';
+const WANTED_AUTORESTART = 'SCP_AUTORESTART';
 
 function readEnvFile(cwd) {
   const out = {};
@@ -96,6 +98,12 @@ export async function POST({ request }) {
     if (action in SIMPLE_ACTIONS) {
       const target = body.id ?? body.name;
       if (target === undefined || target === null || target === '') error(400, 'A process id or name is required.');
+
+      if (action === 'restart') {
+        const healed = await healPendingBuild(target);
+        if (healed) return json({ ok: true, action, target, healed: true, ...healed });
+      }
+
       await SIMPLE_ACTIONS[action](target);
       return json({ ok: true, action, target });
     }
@@ -142,6 +150,24 @@ async function assertPortFree(port, { force = false } = {}) {
   error(409, `${result.reason} Choose another port, or stop what is holding it.`);
 }
 
+async function healPendingBuild(target) {
+  const proc = await pm2.describe(target).catch(() => null);
+  if (!proc || proc.env?.[PENDING_BUILD] !== '1') return null;
+
+  const plain = pm2.appEnv(proc.env);
+  const secrets = readEnvFile(proc.cwd);
+  const envVars = [
+    ...Object.entries(plain).map(([key, value]) => ({ key, value, secret: false })),
+    ...Object.entries(secrets).map(([key, value]) => ({ key, value, secret: true })),
+  ];
+
+  return updateEnv({
+    id: proc.pmId,
+    envVars,
+    overrides: { autorestart: proc.env[WANTED_AUTORESTART] !== '0' },
+  });
+}
+
 async function updateEnv(body) {
   const target = body.id ?? body.name;
   if (target === undefined || target === null || target === '') error(400, 'A process id or name is required.');
@@ -162,6 +188,7 @@ async function updateEnv(body) {
     stack: proc.stack || undefined,
     envVars: body.envVars,
     forcePort: true,
+    ...(body.overrides ?? {}),
   };
 
   await pm2.del(proc.pmId);
@@ -193,6 +220,10 @@ async function startProcess(body) {
     writeEnvFile(cwd, secrets);
   }
   if (body.stack && /^[a-z0-9-]{1,32}$/.test(body.stack)) env.SCP_STACK = body.stack;
+  if (body.registerOnly) {
+    env[PENDING_BUILD] = '1';
+    env[WANTED_AUTORESTART] = body.autorestart === false ? '0' : '1';
+  }
   env[pm2.ENV_KEYS_VAR] = Object.keys(env)
     .filter((k) => !/^SCP_/.test(k))
     .join(',');
@@ -211,10 +242,10 @@ async function startProcess(body) {
       name,
       cwd,
       exec_mode: 'fork',
-      autorestart: body.autorestart !== false,
+      autorestart: body.registerOnly ? false : body.autorestart !== false,
       max_memory_restart: body.maxMemory || undefined,
       min_uptime: 5000,
-      max_restarts: 10,
+      max_restarts: body.registerOnly ? 0 : 10,
       restart_delay: 1000,
       time: true,
       env: {
@@ -261,10 +292,10 @@ async function startProcess(body) {
     instances: execMode === 'cluster' && body.instances ? Number(body.instances) : 1,
     exec_mode: execMode,
     watch: !!body.watch,
-    autorestart: body.autorestart !== false,
+    autorestart: body.registerOnly ? false : body.autorestart !== false,
     max_memory_restart: body.maxMemory || undefined,
     min_uptime: 5000,
-    max_restarts: 10,
+    max_restarts: body.registerOnly ? 0 : 10,
     restart_delay: 1000,
     interpreter,
     interpreter_args: nodeEntry && hasEnvFile ? ['--env-file-if-exists=.env'] : undefined,
