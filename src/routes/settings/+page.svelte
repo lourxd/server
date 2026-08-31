@@ -594,6 +594,12 @@
               <p class="text-muted-foreground font-mono text-[11px] break-all">
                 {data.cloudflare.accountId ?? ''}
               </p>
+              {#if data.cloudflare.reason}
+                <Alert.Root>
+                  <CircleAlert class="size-4" />
+                  <Alert.Description class="text-xs">{data.cloudflare.reason}</Alert.Description>
+                </Alert.Root>
+              {/if}
             {:else}
               <p class="text-muted-foreground text-[11.5px]">
                 Needs <span class="font-mono">Tunnel·Edit</span>,

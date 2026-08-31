@@ -17,7 +17,11 @@ const { tunnels, tunnelRoutes } = schema;
 function requireAccount() {
   const account = accountId();
   if (!account) {
-    throw new CloudflareError('No Cloudflare account selected. Connect a token under Settings.');
+    throw new CloudflareError(
+      'This Cloudflare token can see no account, so it cannot create a tunnel. Give it ' +
+        'Account · Cloudflare Tunnel · Edit and make sure its Account Resources include your ' +
+        'account, then reconnect it under Settings.',
+    );
   }
   return account;
 }

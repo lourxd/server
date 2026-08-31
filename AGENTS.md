@@ -326,6 +326,15 @@ the button appeared to do nothing. `exec.js` adds both the Node bin directory
 and `~/.local/bin` to every child's PATH and to `which()`, which is where the
 panel puts anything it installs without sudo.
 
+**A Cloudflare token that verifies can still be useless.** `/user/tokens/verify`
+succeeds for any live token, including one with only User permissions — it
+proves the token exists, not that it can do anything. What matters is whether
+`/accounts` returns an account: without one every tunnel call posts to
+`/accounts/null/...`. `probeCloudflareToken` treats no visible account as not
+connected and says which permission is missing, and reports `zoneCount` too,
+since a token that can make a tunnel but sees no zone cannot route a hostname
+to it.
+
 **Cloudflare setup lives in Settings and nowhere else.** Network and an app's
 Network tab detect what is missing and link to `/settings?tab=cloudflare`; they
 do not carry their own installer. One place to get it right.

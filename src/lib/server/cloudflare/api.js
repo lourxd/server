@@ -75,29 +75,41 @@ export async function probeCloudflareToken(token) {
       return { connected: false, reason: `Token status is "${verify.status}".` };
     }
 
-    let accountId = null;
-    let accountName = null;
-    try {
-      const accounts = await cf('/accounts', { token, query: { per_page: 50 } });
-      if (accounts?.length) {
-        accountId = accounts[0].id;
-        accountName = accounts[0].name;
-      }
-    } catch {
+    const accounts = await cf('/accounts', { token, query: { per_page: 50 } }).catch(() => []);
+    const zones = await cf('/zones', { token, query: { per_page: 50, status: 'active' } }).catch(() => []);
+
+    const account = accounts?.[0] ?? null;
+    const zoneCount = Array.isArray(zones) ? zones.length : 0;
+
+    if (!account) {
+      return {
+        connected: false,
+        tokenId: verify?.id ?? null,
+        accountId: null,
+        accountName: null,
+        zoneCount,
+        reason:
+          'The token is valid but can see no Cloudflare account, so it cannot create a tunnel. ' +
+          'It needs Account · Cloudflare Tunnel · Edit, and its Account Resources must include the ' +
+          'account you want to use. A token with only User permissions will verify and do nothing.',
+      };
     }
 
     return {
       connected: true,
       tokenId: verify?.id ?? null,
-      accountId,
-      accountName,
-      accounts: accountId ? undefined : [],
+      accountId: account.id,
+      accountName: account.name,
+      zoneCount,
+      reason:
+        zoneCount === 0
+          ? 'No zones are visible to this token, so a hostname cannot be routed. Add Zone · Zone · Read and Zone · DNS · Edit.'
+          : null,
     };
   } catch (err) {
     return { connected: false, reason: err.message };
   }
 }
-
 export function cloudflareStatus() {
   const token = settings().cloudflareToken;
   if (!token) return Promise.resolve({ connected: false, reason: 'No Cloudflare API token configured.' });
