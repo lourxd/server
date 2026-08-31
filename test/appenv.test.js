@@ -111,14 +111,20 @@ test('declaredKeys omits every panel marker', () => {
   assert.equal(keys, 'PORT,NODE_ENV');
 });
 
-test('un-keying a stored secret keeps its value instead of blanking it', () => {
+test('a secret on disk stays a secret, whatever the client sends', () => {
   const onDisk = { DATABASE_URL: 'postgres://u:p@neon.tech/db' };
   const { plain, secret } = splitEnv(
     [{ key: 'DATABASE_URL', value: '', secret: false, stored: true }],
     onDisk,
   );
-  assert.equal(plain.DATABASE_URL, 'postgres://u:p@neon.tech/db');
-  assert.deepEqual(secret, {}, 'it must leave .env');
+  assert.deepEqual(plain, {}, 'it must not reach PM2');
+  assert.equal(secret.DATABASE_URL, 'postgres://u:p@neon.tech/db', 'and must keep its value');
+});
+
+test('dropping a secret row removes it from .env entirely', () => {
+  const { plain, secret } = splitEnv([{ key: 'PORT', value: '3000', secret: false }], { OLD: 'gone' });
+  assert.deepEqual(plain, { PORT: '3000' });
+  assert.deepEqual(secret, {}, 'a row that is not sent is not written back');
 });
 
 test('keying a plain value moves it into .env with its value intact', () => {
