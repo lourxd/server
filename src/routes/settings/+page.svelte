@@ -638,20 +638,43 @@
               {/if}
             </div>
 
-            {#if !data.cloudflare.connected && !data.config.hasCloudflareToken}
-              <p class="text-muted-foreground pl-[7.5rem] text-[11.5px]">
-                Needs <span class="font-mono">Tunnel·Edit</span>,
-                <span class="font-mono">DNS·Edit</span> and <span class="font-mono">Zone·Read</span>.
+            <div class="panel space-y-3 rounded-xl p-3.5">
+              <div class="flex flex-wrap items-baseline gap-2">
+                <span class="eyebrow">What the token needs</span>
                 <a
                   href="https://dash.cloudflare.com/profile/api-tokens"
                   target="_blank"
                   rel="noreferrer"
-                  class="text-primary inline-flex items-center gap-1 hover:underline"
+                  class="text-primary ml-auto inline-flex items-center gap-1 text-[11.5px] hover:underline"
                 >
-                  Create one<ExternalLink class="size-3" />
+                  Create a token<ExternalLink class="size-3" />
                 </a>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div class="space-y-1.5">
+                  <p class="text-muted-foreground text-[11px]">Permissions</p>
+                  <div class="space-y-1 font-mono text-[11px]">
+                    <p>Account · Cloudflare Tunnel · Edit</p>
+                    <p>Zone · Zone · Read</p>
+                    <p>Zone · DNS · Edit</p>
+                  </div>
+                </div>
+                <div class="space-y-1.5">
+                  <p class="text-muted-foreground text-[11px]">Resources</p>
+                  <div class="space-y-1 font-mono text-[11px]">
+                    <p>Account Resources · Include · your account</p>
+                    <p>Zone Resources · Include · All zones</p>
+                  </div>
+                </div>
+              </div>
+
+              <p class="text-muted-foreground text-[11.5px] leading-relaxed">
+                Tunnel · Edit creates the tunnel, Zone · Read finds the domain, DNS · Edit points the
+                hostname at it. All three are needed — a token missing Zone permissions verifies fine
+                and then cannot route anything.
               </p>
-            {/if}
+            </div>
 
             {#if data.cloudflare.reason && data.cloudflare.reason !== 'No Cloudflare API token configured.'}
               <Alert.Root variant={data.cloudflare.connected ? 'default' : 'destructive'}>

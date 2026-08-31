@@ -204,11 +204,21 @@ see `src/routes/api/` — they simply have no UI at the moment.
 
 ## Cloudflare setup
 
-Create a token at **Cloudflare → My Profile → API Tokens** with:
+Create a token at **Cloudflare → My Profile → API Tokens** with all three
+permissions, and resources that include what you want to use:
 
-- `Account → Cloudflare Tunnel → Edit`
-- `Zone → DNS → Edit`
-- `Zone → Zone → Read`
+| | |
+|---|---|
+| `Account → Cloudflare Tunnel → Edit` | creates the tunnel |
+| `Zone → Zone → Read` | finds the domain |
+| `Zone → DNS → Edit` | points the hostname at the tunnel |
+| `Account Resources → Include → your account` | |
+| `Zone Resources → Include → All zones` | |
+
+A token missing the Zone permissions verifies fine and then cannot route
+anything — Cloudflare answers an empty list rather than an error. The panel
+also needs your **Account ID**, which it reads from the token when it can and
+otherwise asks for; it is the hex string in your dashboard URL.
 
 Settings → Cloudflare walks through it: paste the token, install `cloudflared`
 (a static binary into `~/.local/bin`, no sudo), then create a tunnel. Creating a route writes a proxied CNAME to
