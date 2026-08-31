@@ -36,7 +36,9 @@
 
   let { data } = $props();
 
-  let cloneOpen = $state(false);
+  let jobOpen = $state(false);
+  let phase = $state('form');
+  let job = $state({ kind: 'clone', label: 'Clone a repository' });
   let source = $state('github');
   let ghRepos = $state([]);
   let ghLoading = $state(false);
@@ -48,7 +50,6 @@
   let running = $state(false);
   let failed = $state(false);
   let lines = $state([]);
-  let title = $state('');
 
   let confirmOpen = $state(false);
   let confirmState = $state({ title: '', description: '', label: '', action: null });
@@ -81,15 +82,25 @@
     cloneUrl = '';
     cloneBranch = '';
     lines = [];
+    failed = false;
+    phase = 'form';
+    job = { kind: 'clone', label: 'Clone a repository' };
     source = data.github.connected ? 'github' : 'url';
-    cloneOpen = true;
+    jobOpen = true;
+  }
+
+  function runOn(repo, kind, label, body) {
+    lines = [];
+    failed = false;
+    phase = 'running';
+    job = { kind, label, repo };
+    jobOpen = true;
+    return stream(label, body);
   }
 
   async function stream(label, body) {
     running = true;
     failed = false;
-    title = label;
-    lines = [];
     let ok = false;
     try {
       await streamPost('/api/repos/run', body, (event, payload) => {
@@ -101,12 +112,8 @@
     }
     running = false;
     failed = !ok;
-    if (ok) {
-      toasts.ok(`${label} finished`);
-      await invalidateAll();
-    } else {
-      toasts.error(`${label} failed`, 'See the output for details.');
-    }
+    phase = 'done';
+    if (ok) await invalidateAll();
     return ok;
   }
 
@@ -115,15 +122,20 @@
     if (!url) return;
     const name = source === 'github' ? ghPicked?.name : undefined;
     const branch = source === 'github' ? ghPicked?.defaultBranch : cloneBranch.trim() || undefined;
-    const ok = await stream('Clone', { action: 'clone', url, name, branch });
-    if (ok) cloneOpen = false;
+    lines = [];
+    phase = 'running';
+    job = { kind: 'clone', label: `Cloning ${name ?? url}` };
+    await stream('Clone', { action: 'clone', url, name, branch });
   }
 
-  const pull = (repo) => stream(`Pull ${repo.name}`, { action: 'pull', path: repo.relPath });
-  const fetch = (repo) => stream(`Fetch ${repo.name}`, { action: 'fetch', path: repo.relPath });
-  const install = (repo) => stream(`Install ${repo.name}`, { action: 'install', path: repo.relPath });
+  const pull = (repo) =>
+    runOn(repo, 'pull', `Pulling ${repo.name}`, { action: 'pull', path: repo.relPath });
+  const fetch = (repo) =>
+    runOn(repo, 'fetch', `Fetching ${repo.name}`, { action: 'fetch', path: repo.relPath });
+  const install = (repo) =>
+    runOn(repo, 'install', `Installing ${repo.name}`, { action: 'install', path: repo.relPath });
   const build = (repo) =>
-    stream(`Build ${repo.name}`, {
+    runOn(repo, 'build', `Building ${repo.name}`, {
       action: 'run-script',
       script: 'build',
       path: repo.relPath,
@@ -339,31 +351,26 @@
     </div>
   {/if}
 
-  {#if lines.length}
-    <div class="panel overflow-hidden rounded-2xl">
-      <div class="flex items-center gap-2.5 px-4.5 py-3">
-        <h2 class="text-[15px] font-semibold">{title}</h2>
-        {#if running}
-          <LoaderCircle class="text-muted-foreground size-3.5 animate-spin" />
-        {/if}
-        <Button variant="ghost" size="sm" class="ml-auto h-7 rounded-lg" onclick={() => (lines = [])}>
-          Clear
-        </Button>
-      </div>
-      <LogStream {lines} {failed} height="320px" />
-    </div>
-  {/if}
 </div>
 
-<Dialog.Root bind:open={cloneOpen}>
+<Dialog.Root bind:open={jobOpen}>
   <Dialog.Content class="max-h-[88vh] overflow-y-auto sm:max-w-xl">
     <Dialog.Header>
-      <Dialog.Title>Clone a repository</Dialog.Title>
+      <Dialog.Title>{job.label}</Dialog.Title>
       <Dialog.Description>
-        It is cloned into your projects directory. Deploying it as an app is a separate step.
+        {#if phase === 'form'}
+          It is cloned into your projects directory. Deploying it as an app is a separate step.
+        {:else if running}
+          Output appears below as it happens.
+        {:else if failed}
+          It did not finish — the output is below.
+        {:else}
+          Finished.
+        {/if}
       </Dialog.Description>
     </Dialog.Header>
 
+    {#if phase === 'form'}
     <Tabs.Root bind:value={source} class="space-y-3">
       <Tabs.List class="w-full">
         <Tabs.Trigger value="github" class="flex-1 gap-1.5"><GitFork class="size-3.5" /> GitHub</Tabs.Trigger>
@@ -436,21 +443,25 @@
         </div>
       </Tabs.Content>
     </Tabs.Root>
-
-    {#if lines.length}
-      <LogStream {lines} {failed} height="224px" />
+    {:else}
+      <LogStream {lines} {failed} height="46vh" />
     {/if}
 
     <Dialog.Footer>
-      <Button variant="ghost" onclick={() => (cloneOpen = false)} disabled={running}>Cancel</Button>
-      <Button
-        class="accent-fill rounded-xl px-4 font-semibold"
-        disabled={running || (source === 'github' ? !ghPicked : !cloneUrl.trim())}
-        onclick={runClone}
-      >
-        {#if running}<LoaderCircle class="size-4 animate-spin" />{:else}<Download class="size-4" />{/if}
-        {running ? 'Cloning…' : 'Clone'}
-      </Button>
+      {#if phase === 'form'}
+        <Button variant="ghost" onclick={() => (jobOpen = false)}>Cancel</Button>
+        <Button
+          class="accent-fill rounded-xl px-4 font-semibold"
+          disabled={source === 'github' ? !ghPicked : !cloneUrl.trim()}
+          onclick={runClone}
+        >
+          <Download class="size-4" /> Clone
+        </Button>
+      {:else}
+        <Button variant="outline" disabled={running} onclick={() => (jobOpen = false)}>
+          {running ? 'Running…' : 'Close'}
+        </Button>
+      {/if}
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>
