@@ -287,7 +287,8 @@ export async function startTunnel(tunnelId) {
   await pm2.start({
     script: bin,
     name,
-    args: ['tunnel', '--no-autoupdate', '--metrics', '127.0.0.1:0', 'run', '--token', tunnel.token],
+    args: ['tunnel', '--no-autoupdate', '--metrics', '127.0.0.1:0', 'run'],
+    env: { SCP_KIND: 'tunnel', TUNNEL_TOKEN: tunnel.token },
     exec_mode: 'fork',
     autorestart: true,
     max_restarts: 20,

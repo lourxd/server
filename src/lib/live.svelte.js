@@ -3,7 +3,7 @@ import { browser } from '$app/environment';
 class LiveState {
   connected = $state(false);
   metrics = $state(null);
-  apps = $state([]);
+  all = $state([]);
   events = $state([]);
   activity = $state({});
   lastError = $state(null);
@@ -28,7 +28,7 @@ class LiveState {
     });
 
     es.addEventListener('metrics', (e) => { this.metrics = JSON.parse(e.data); });
-    es.addEventListener('apps', (e) => { this.apps = JSON.parse(e.data); });
+    es.addEventListener('apps', (e) => { this.all = JSON.parse(e.data); });
     es.addEventListener('activity', (e) => { this.activity = JSON.parse(e.data); });
 
     es.addEventListener('pm2:event', (e) => {
@@ -60,6 +60,9 @@ class LiveState {
     this.#logHandlers.add(fn);
     return () => this.#logHandlers.delete(fn);
   }
+
+  get apps() { return this.all.filter((a) => a.kind !== 'tunnel'); }
+  get connectors() { return this.all.filter((a) => a.kind === 'tunnel'); }
 
   get online() { return this.apps.filter((a) => a.status === 'online').length; }
   get stopped() { return this.apps.filter((a) => a.status === 'stopped').length; }

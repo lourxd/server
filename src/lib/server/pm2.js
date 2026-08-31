@@ -116,6 +116,12 @@ function shapeLog(packet, stream) {
   };
 }
 
+const isManaged = (p) => {
+  const env = p.pm2_env || {};
+  const kind = env.env?.SCP_KIND ?? env.SCP_KIND;
+  return kind === 'tunnel' || /^tunnel-/.test(p.name ?? '');
+};
+
 export function shapeProcess(p) {
   const env = p.pm2_env || {};
   return {
@@ -136,7 +142,7 @@ export function shapeProcess(p) {
     version: env.version || null,
     script: env.pm_exec_path || null,
     cwd: env.pm_cwd || null,
-    args: env.args || [],
+    args: isManaged(p) ? [] : env.args || [],
     interpreter: env.exec_interpreter || null,
     watching: !!env.watch,
     autorestart: env.autorestart !== false,
@@ -146,6 +152,7 @@ export function shapeProcess(p) {
     createdAt: env.created_at || null,
     user: env.username || null,
     stack: env.env?.SCP_STACK ?? env.SCP_STACK ?? null,
+    kind: env.env?.SCP_KIND ?? env.SCP_KIND ?? (/^tunnel-/.test(p.name ?? '') ? 'tunnel' : 'app'),
     port: env.env?.PORT ?? env.PORT ?? null,
     dbId: env.env?.SCP_DB ?? env.SCP_DB ?? null,
     dbVar: env.env?.SCP_DB_VAR ?? env.SCP_DB_VAR ?? null,

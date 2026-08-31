@@ -496,6 +496,15 @@ Do not treat these as bugs to discover — they are known and deferred.
   Running an authoritative nameserver on the box is not viable: port 53 is
   EACCES for the panel's user, `systemd-resolved` already holds 127.0.0.53:53,
   and the machine is behind NAT (192.168.50.227 vs 85.246.175.66).
+- **A tunnel connector is a PM2 process, and must not read as an app.**
+  `shapeProcess` sets `kind` from `SCP_KIND`, falling back to a `tunnel-` name
+  prefix for ones started before the marker existed. `live.apps` filters them
+  out; `live.all` is the unfiltered list and `live.connectors` the tunnels.
+  `listTunnels()` matches by `pm2Name` against `pm2.list()` and is unaffected.
+- **Never put a secret in a PM2 process's argv.** `ps` shows argv to every user
+  on the machine, and the panel sent `args` to the browser. The connector takes
+  its run token through `TUNNEL_TOKEN` now, and `shapeProcess` blanks `args` for
+  a managed process so a token in an older one is not served to a page.
 - **`shapeProcess` is the only place app metadata gets read out of PM2's env.**
   `list()` drops the raw env, so anything the UI needs — `stack`, `port`,
   `dbId`, `dbVar` — has to be lifted there. A component reaching for
