@@ -47,6 +47,7 @@ const DEFAULTS = {
   githubUser: '',
   cloudflareToken: '',
   cloudflareAccountId: '',
+  watchedDomains: [],
   theme: 'dark',
 };
 
@@ -99,6 +100,7 @@ export async function publicSettings() {
     hasCloudflareToken: !!s.cloudflareToken,
     cloudflareTokenTail: s.cloudflareToken ? s.cloudflareToken.slice(-4) : null,
     cloudflareAccountId: s.cloudflareAccountId,
+    watchedDomains: Array.isArray(s.watchedDomains) ? s.watchedDomains : [],
     theme: s.theme,
   };
 }

@@ -523,6 +523,13 @@ Do not treat these as bugs to discover — they are known and deferred.
   adds one through the same `/api/tunnels` actions. Installing `cloudflared` and
   creating a tunnel stay on the Network page; the tab links there rather than
   duplicating them.
+- **DNS reads, it never writes — that is what makes it provider-free.**
+  `server/dns.js` uses `node:dns` and an HTTP probe only: no account anywhere.
+  A domain is "serving" when it resolves AND answers, which is the only check
+  that survives a proxy — a proxied Cloudflare record resolves to anycast IPs,
+  so comparing against an expected CNAME or the server's own IP reports a
+  working domain as broken. Cloudflare zone access stays where it is genuinely
+  needed: creating a tunnel route writes the CNAME for you.
 - **Tunnels and DNS are pages of their own.** They were tabs on Network for a
   while; ingress is used far more than interface telemetry and buried badly
   there. Network is machine networking again — throughput, interfaces, listening

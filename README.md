@@ -180,8 +180,11 @@ and reconnects to the daemon on its own.
 - **Tunnels** — Publish an app to the internet with no inbound port open. Named
   tunnels on your own hostnames, or throwaway `trycloudflare.com` ones; route a
   hostname by picking a running app rather than typing a URL.
-- **DNS** — Records per zone: create, edit, delete, proxy toggle, and a Check
-  that resolves against 1.1.1.1 and 8.8.8.8 so you see what the internet sees.
+- **DNS** — Provider-free: the panel reads DNS, it never writes it, so any
+  registrar works. Domains routed through a tunnel appear automatically, and you
+  can watch any other; each shows what it resolves to, whether it actually
+  answers over HTTP, and the record to create if it does not. Plus a lookup
+  against 1.1.1.1 and 8.8.8.8 for any hostname.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail in tabs — Overview, Environment, Database, Logs — with a live log
   stream, and a Build view beside it holding the output of the last build the
