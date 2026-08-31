@@ -210,8 +210,8 @@ Create a token at **Cloudflare → My Profile → API Tokens** with:
 - `Zone → DNS → Edit`
 - `Zone → Zone → Read`
 
-Then install `cloudflared` from the Tunnels tab (it downloads the static binary
-into `~/.local/bin`, no sudo). Creating a route writes a proxied CNAME to
+Settings → Cloudflare walks through it: paste the token, install `cloudflared`
+(a static binary into `~/.local/bin`, no sudo), then create a tunnel. Creating a route writes a proxied CNAME to
 `<tunnel-id>.cfargotunnel.com` and pushes the ingress rule to Cloudflare; the
 record is removed again when you delete the route.
 
