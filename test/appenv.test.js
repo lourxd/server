@@ -110,3 +110,30 @@ test('declaredKeys omits every panel marker', () => {
   const keys = declaredKeys({ PORT: '1', NODE_ENV: 'production', SCP_DB: 'x', SCP_STACK: 'nextjs' });
   assert.equal(keys, 'PORT,NODE_ENV');
 });
+
+test('un-keying a stored secret keeps its value instead of blanking it', () => {
+  const onDisk = { DATABASE_URL: 'postgres://u:p@neon.tech/db' };
+  const { plain, secret } = splitEnv(
+    [{ key: 'DATABASE_URL', value: '', secret: false, stored: true }],
+    onDisk,
+  );
+  assert.equal(plain.DATABASE_URL, 'postgres://u:p@neon.tech/db');
+  assert.deepEqual(secret, {}, 'it must leave .env');
+});
+
+test('keying a plain value moves it into .env with its value intact', () => {
+  const { plain, secret } = splitEnv([{ key: 'API_KEY', value: 'live-value', secret: true }], {});
+  assert.deepEqual(plain, {});
+  assert.equal(secret.API_KEY, 'live-value');
+});
+
+test('an empty plain row that was never stored stays empty', () => {
+  const { plain } = splitEnv([{ key: 'OPTIONAL', value: '', secret: false }], { OTHER: 'x' });
+  assert.equal(plain.OPTIONAL, '');
+});
+
+test('a stored secret left alone survives a save', () => {
+  const onDisk = { TOKEN: 'kept' };
+  const { secret } = splitEnv([{ key: 'TOKEN', value: '', secret: true, stored: true }], onDisk);
+  assert.equal(secret.TOKEN, 'kept');
+});

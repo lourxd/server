@@ -33,6 +33,7 @@
 
   const invalid = $derived(vars.filter((v) => v.key && !KEY_RE.test(v.key)).map((v) => v.key));
   const secretCount = $derived(vars.filter((v) => v.secret && v.key).length);
+  const demoted = $derived(vars.filter((v) => v.stored && !v.secret).map((v) => v.key));
 
   export function problems() {
     return { duplicates: [...duplicates], invalid };
@@ -172,7 +173,11 @@
               variant="ghost"
               size="icon"
               class={cn('size-8 rounded-lg', v.secret && 'text-primary')}
-              title={v.secret ? 'Stored encrypted, written to .env' : 'Plain value, passed to PM2'}
+              title={v.secret
+                ? 'Written to .env at mode 0600, never given to PM2'
+                : v.stored
+                  ? 'Will move out of .env into PM2 on save'
+                  : 'Plain value, passed to PM2'}
               onclick={() => toggleSecret(i)}
             >
               <KeyRound class="size-3.5" />
@@ -200,6 +205,19 @@
         </div>
       {/each}
     </div>
+  {/if}
+
+  {#if demoted.length}
+    <Alert.Root>
+      <TriangleAlert class="size-4" />
+      <Alert.Description class="text-xs">
+        <strong>{demoted.join(', ')}</strong>
+        {demoted.length === 1 ? 'is' : 'are'} no longer marked secret. Saving keeps the stored value but
+        moves it out of <code class="font-mono">.env</code> into PM2's environment, where
+        <code class="font-mono">pm2 save</code> writes it to a world-readable file. Click the key again
+        to leave it where it is.
+      </Alert.Description>
+    </Alert.Root>
   {/if}
 
   {#if duplicates.size || invalid.length}

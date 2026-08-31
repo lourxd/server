@@ -161,7 +161,7 @@
       const res = await api('/api/apps', {
         action: 'update-env',
         id: data.proc.pmId,
-        envVars: envVars.map(({ key, value, secret }) => ({ key, value, secret })),
+        envVars: envVars.map(({ key, value, secret, stored }) => ({ key, value, secret, stored })),
       });
       toasts.ok('Environment saved', `${app.name} restarted`);
       const next = res?.result?.[0]?.pm2_env?.pm_id ?? res?.result?.pm_id;

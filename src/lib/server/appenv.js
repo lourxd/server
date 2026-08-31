@@ -23,12 +23,14 @@ export function splitEnv(rows, existingSecrets = {}) {
     if (!key) continue;
     if (!ENV_KEY_RE.test(key)) throw new Error(`Invalid environment variable name: ${key}`);
 
+    const typed = String(row.value ?? '');
+    const keepStored = typed === '' && row.stored === true && key in existingSecrets;
+
     if (!row.secret) {
-      plain[key] = String(row.value ?? '');
+      plain[key] = keepStored ? existingSecrets[key] : typed;
       continue;
     }
-    const typed = String(row.value ?? '');
-    secret[key] = typed === '' && key in existingSecrets ? existingSecrets[key] : typed;
+    secret[key] = keepStored || (typed === '' && key in existingSecrets) ? existingSecrets[key] : typed;
   }
   return { plain, secret };
 }
