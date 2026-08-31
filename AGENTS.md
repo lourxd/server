@@ -328,6 +328,14 @@ destructuring, `{#each}` bindings, `{@const}`, snippets, arrow parameters) and
 fails on anything the markup references that is not there. It found a dangling
 `appTargets` in the quick-tunnel dialog that would have crashed that dialog.
 
+**Deleting a module-scope function leaves no trace until it is called.** A
+helper removed as "unused" that another function in the same file still calls
+builds cleanly and throws at runtime — Rollup treats the missing name as a
+global. Deleting an internal function means grepping the file for it, not
+trusting an export audit: `createRecord` and `updateRecord` looked unreferenced
+from outside while `upsertRecord` depended on both, and removing them would have
+broken every tunnel route.
+
 **A Rollup "not exported" warning is a runtime crash in waiting.** `disconnect`
 was called by `realtime.js` but not exported from `pm2.js`; the build succeeded
 and shutdown would have thrown.

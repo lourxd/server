@@ -1,9 +1,10 @@
 import dns from 'node:dns/promises';
 import { cached } from './cache.js';
+import { RECORD_TYPES } from '../dns-records.js';
 
 const RESOLVERS = ['1.1.1.1', '8.8.8.8'];
 
-export const RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'TXT', 'MX', 'NS', 'SRV', 'CAA'];
+export { RECORD_TYPES };
 
 const REASONS = {
   ENOTFOUND: 'No such hostname.',

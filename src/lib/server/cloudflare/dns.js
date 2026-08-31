@@ -1,10 +1,7 @@
-import dns from 'node:dns/promises';
 import { cf, cfList, accountId } from './api.js';
 import { cached, invalidate } from '../cache.js';
 
 import { RECORD_TYPES, isProxyable } from '../../dns-records.js';
-
-export { RECORD_TYPES, isProxyable };
 
 export function listZones() {
   const account = accountId();
@@ -47,16 +44,6 @@ function shapeRecord(r) {
   };
 }
 
-export function listRecords(zoneId, { type, search } = {}) {
-  const key = `cf:records:${zoneId}:${type ?? ''}:${search ?? ''}`;
-  return cached(key, 15_000, async () => {
-    const records = await cfList(`/zones/${zoneId}/dns_records`, {
-      query: { type: type || undefined, name: search ? `contains:${search}` : undefined, order: 'type' },
-    });
-    return records.map(shapeRecord);
-  });
-}
-
 function toRecordBody(input) {
   const type = String(input.type || '').toUpperCase();
   if (!RECORD_TYPES.includes(type)) throw new Error(`Unsupported record type: ${type}`);
@@ -96,13 +83,12 @@ function toRecordBody(input) {
   return body;
 }
 
-export async function createRecord(zoneId, input) {
+async function createRecord(zoneId, input) {
   const result = await cf(`/zones/${zoneId}/dns_records`, { method: 'POST', body: toRecordBody(input) });
   invalidate(`cf:records:${zoneId}`);
   return shapeRecord(result);
 }
-
-export async function updateRecord(zoneId, recordId, input) {
+async function updateRecord(zoneId, recordId, input) {
   const result = await cf(`/zones/${zoneId}/dns_records/${recordId}`, {
     method: 'PUT',
     body: toRecordBody(input),
@@ -123,45 +109,3 @@ export async function upsertRecord(zoneId, input) {
   return match ? updateRecord(zoneId, match.id, input) : createRecord(zoneId, input);
 }
 
-export async function resolve(hostname, type = 'A') {
-  const started = Date.now();
-  try {
-    const resolver = new dns.Resolver({ timeout: 5000, tries: 2 });
-    resolver.setServers(['1.1.1.1', '8.8.8.8']);
-
-    const answers = await resolver.resolve(hostname, type);
-    return {
-      ok: true,
-      hostname,
-      type,
-      answers: (Array.isArray(answers) ? answers : [answers]).map((a) =>
-        typeof a === 'string' ? a : JSON.stringify(a),
-      ),
-      durationMs: Date.now() - started,
-    };
-  } catch (err) {
-    const reasons = {
-      ENOTFOUND: 'No such hostname.',
-      ENODATA: `No ${type} record found.`,
-      ETIMEOUT: 'The DNS query timed out.',
-      SERVFAIL: 'The resolver returned SERVFAIL.',
-    };
-    return {
-      ok: false,
-      hostname,
-      type,
-      error: reasons[err.code] ?? err.message,
-      code: err.code,
-      durationMs: Date.now() - started,
-    };
-  }
-}
-
-export function publicIp() {
-  return cached('cf:publicip', 300_000, async () => {
-    const res = await fetch('https://cloudflare.com/cdn-cgi/trace', { signal: AbortSignal.timeout(8000) });
-    const text = await res.text();
-    const ip = text.match(/^ip=(.+)$/m)?.[1] ?? null;
-    return { ip, ipv6: ip?.includes(':') ?? false };
-  });
-}

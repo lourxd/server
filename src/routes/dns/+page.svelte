@@ -4,6 +4,7 @@
   import { api, apiGet, toasts } from '$lib/live.svelte.js';
   import { cn } from '$lib/utils.js';
   import { relTime } from '$lib/format.js';
+  import { RECORD_TYPES as TYPES } from '$lib/dns-records.js';
 
   import { Button } from '$lib/components/ui/button/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
@@ -19,7 +20,6 @@
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 
-  const TYPES = ['A', 'AAAA', 'CNAME', 'TXT', 'MX', 'NS', 'SRV', 'CAA'];
 
   let { data } = $props();
 
