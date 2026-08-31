@@ -8,6 +8,7 @@ import { settings } from '$srv/store/settings.js';
 import { isRemote, ENGINES } from '$srv/db/provision.js';
 import { cloudflareStatus } from '$srv/cloudflare/api.js';
 import { binaryStatus, listTunnels } from '$srv/cloudflare/tunnels.js';
+import { listZones } from '$srv/cloudflare/dns.js';
 
 function secretKeys(cwd) {
   if (!cwd) return [];
@@ -26,13 +27,14 @@ function secretKeys(cwd) {
 
 export async function load({ params }) {
   try {
-    const [proc, logs, connections, cloudflare, binary, tunnels] = await Promise.all([
+    const [proc, logs, connections, cloudflare, binary, tunnels, zones] = await Promise.all([
       pm2.describe(params.id),
       tail(params.id, 300).catch(() => ({ lines: [] })),
       listConnections().catch(() => []),
       cloudflareStatus().catch(() => ({ connected: false, reason: 'Could not reach Cloudflare.' })),
       binaryStatus().catch(() => ({ installed: false })),
       listTunnels().catch(() => []),
+      listZones().catch(() => []),
     ]);
 
     const plain = pm2.appEnv(proc.env);
@@ -53,6 +55,7 @@ export async function load({ params }) {
       cloudflare,
       binary,
       tunnels,
+      zones,
     };
   } catch (err) {
     error(404, err.message);

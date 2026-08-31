@@ -326,6 +326,13 @@ the button appeared to do nothing. `exec.js` adds both the Node bin directory
 and `~/.local/bin` to every child's PATH and to `which()`, which is where the
 panel puts anything it installs without sudo.
 
+**Cloudflare returns an empty list, not an error, for anything a token cannot
+see.** `/accounts` and `/zones` both answer 200 with `result: []` and no
+`errors`, so absence never distinguishes "you have none" from "this token
+cannot see them". Say which it is: no zones visible at all is a token-scope
+problem, while zones visible but none matching is a wrong hostname — the route
+error names the zones it can see.
+
 **Listing Cloudflare accounts needs `Account · Account Settings · Read`, which
 `Cloudflare Tunnel · Edit` does not include.** An empty `/accounts` therefore
 says nothing about whether a token can create a tunnel — never reject one on

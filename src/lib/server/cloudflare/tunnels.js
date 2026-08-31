@@ -223,7 +223,16 @@ export async function addRoute(tunnelId, { hostname, service, path: routePath })
     .filter((z) => host === z.name || host.endsWith(`.${z.name}`))
     .sort((a, b) => b.name.length - a.name.length)[0];
   if (!zone) {
-    throw new Error(`No Cloudflare zone in this account covers ${host}. Add the domain to Cloudflare first.`);
+    if (!zones.length) {
+      throw new Error(
+        `This Cloudflare token cannot see any zone, so ${host} cannot be routed. Give it ` +
+          'Zone · Zone · Read and Zone · DNS · Edit, and make sure its Zone Resources include the ' +
+          'domain — a token scoped to one zone will not list the others.',
+      );
+    }
+    throw new Error(
+      `No zone this token can see covers ${host}. It sees ${zones.map((z) => z.name).join(', ')}.`,
+    );
   }
 
   const record = await upsertRecord(zone.id, {
