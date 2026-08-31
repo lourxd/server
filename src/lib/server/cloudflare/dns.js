@@ -1,5 +1,5 @@
 import dns from 'node:dns/promises';
-import { cf, cfList } from './api.js';
+import { cf, cfList, accountId } from './api.js';
 import { cached, invalidate } from '../cache.js';
 
 import { RECORD_TYPES, isProxyable } from '../../dns-records.js';
@@ -7,8 +7,11 @@ import { RECORD_TYPES, isProxyable } from '../../dns-records.js';
 export { RECORD_TYPES, isProxyable };
 
 export function listZones() {
-  return cached('cf:zones', 60_000, async () => {
-    const zones = await cfList('/zones', { query: { status: 'active' } });
+  const account = accountId();
+  return cached(`cf:zones:${account ?? 'all'}`, 60_000, async () => {
+    const zones = await cfList('/zones', {
+      query: { status: 'active', ...(account ? { 'account.id': account } : {}) },
+    });
     return zones.map((z) => ({
       id: z.id,
       name: z.name,
