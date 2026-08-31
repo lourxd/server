@@ -4,6 +4,7 @@ import path from 'node:path';
 import { run, runStreaming } from './exec.js';
 import { settings } from './store/settings.js';
 import { cached, invalidate } from './cache.js';
+import { frameworkFor } from '../frameworks.js';
 
 const SEP = '\u001f';
 const FMT = ['%H', '%h', '%s', '%an', '%aI'].join('%x1f');
@@ -53,6 +54,23 @@ async function findRepos(base, depth = 2) {
   }
   await walk(base, 1);
   return found;
+}
+
+const MARKER_FILES = [
+  'package.json', 'wrangler.toml', 'wrangler.json', 'wrangler.jsonc', 'vercel.json',
+  'netlify.toml', 'go.mod', 'requirements.txt', 'pyproject.toml', 'manage.py', 'nest-cli.json',
+];
+
+function projectFiles(dir) {
+  try {
+    return fss
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => e.name)
+      .filter((n) => MARKER_FILES.includes(n) || /^(next|nuxt|astro|svelte|vite)\.config\./.test(n));
+  } catch {
+    return [];
+  }
 }
 
 async function readPackageJson(dir) {
@@ -144,6 +162,7 @@ export async function repoInfo(dir, { detailed = false } = {}) {
     lastCommit: commits[0] || null,
     pkg: await readPackageJson(dir),
     packageManager: detectPackageManager(dir),
+    framework: frameworkFor({ pkg: await readPackageJson(dir), files: projectFiles(dir) }),
     ecosystemFile: findEcosystemFile(dir),
     hasNodeModules: fss.existsSync(path.join(dir, 'node_modules')),
   };
@@ -190,6 +209,7 @@ export async function listRepoPaths() {
         ecosystemFile: findEcosystemFile(dir),
         hasNodeModules: fss.existsSync(path.join(dir, 'node_modules')),
         pkg: await readPackageJson(dir),
+        framework: frameworkFor({ pkg: await readPackageJson(dir), files: projectFiles(dir) }),
       })),
     );
   });

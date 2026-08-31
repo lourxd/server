@@ -15,6 +15,7 @@
   import * as Alert from '$lib/components/ui/alert/index.js';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import TechLogo from '$lib/components/TechLogo.svelte';
   import LogStream from '$lib/components/LogStream.svelte';
 
   import Plus from '@lucide/svelte/icons/plus';
@@ -180,12 +181,34 @@
         {@const apps = appsFor(repo)}
         <div class="panel-raised flex flex-col gap-3 rounded-2xl p-4.5">
           <div class="flex items-start gap-3">
-            <div class="bg-foreground/6 grid size-9 shrink-0 place-items-center rounded-xl">
-              <GitFork class="text-foreground/80 size-4.5" />
+            <div
+              class={cn(
+                'grid size-9 shrink-0 place-items-center rounded-xl',
+                repo.framework?.deployable === false
+                  ? 'bg-foreground/4 text-foreground/35'
+                  : 'bg-foreground/6 text-foreground/80',
+              )}
+            >
+              {#if repo.framework?.logo}
+                <TechLogo name={repo.framework.logo} class="size-4.5" />
+              {:else}
+                <GitFork class="size-4.5" />
+              {/if}
             </div>
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
                 <p class="truncate text-[14.5px] font-semibold">{repo.name}</p>
+                {#if repo.framework}
+                  <Badge
+                    variant="outline"
+                    class={cn(
+                      'shrink-0 font-mono text-[10px]',
+                      repo.framework.deployable ? '' : 'border-warn/40 text-warn',
+                    )}
+                  >
+                    {repo.framework.label}
+                  </Badge>
+                {/if}
                 {#if repo.remoteWeb}
                   <a
                     href={repo.remoteWeb}
@@ -209,10 +232,12 @@
                 {/snippet}
               </DropdownMenu.Trigger>
               <DropdownMenu.Content align="end" class="w-48">
-                <DropdownMenu.Item onSelect={() => goto(`/apps?deploy=${encodeURIComponent(repo.relPath)}`)}>
-                  <Rocket class="size-4" /> Deploy as app
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator />
+                {#if repo.framework?.deployable !== false}
+                  <DropdownMenu.Item onSelect={() => goto(`/apps?deploy=${encodeURIComponent(repo.relPath)}`)}>
+                    <Rocket class="size-4" /> Deploy as app
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Separator />
+                {/if}
                 <DropdownMenu.Item disabled={running} onSelect={() => pull(repo)}>
                   <Download class="size-4" /> Pull
                 </DropdownMenu.Item>
@@ -296,6 +321,8 @@
                     </Button>
                   {/each}
                 </div>
+              {:else if repo.framework?.deployable === false}
+                <p class="text-muted-foreground text-[11.5px]">{repo.framework.reason}</p>
               {:else}
                 <Button
                   size="sm"

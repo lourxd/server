@@ -161,8 +161,10 @@ and reconnects to the daemon on its own.
   memory, disk and network vitals; app roll-up and recent lifecycle events;
   per-core load and temperatures; 4-minute history for processor, memory and
   disk I/O; all filesystems; and the top 25 OS processes.
-- **Repositories** — Everything cloned into the projects directory: branch,
-  ahead/behind, uncommitted count, last commit, and which apps run from it.
+- **Repositories** — Everything cloned into the projects directory: the
+  framework it uses, branch, ahead/behind, uncommitted count, last commit, and
+  which apps run from it. A project that cannot run here — Cloudflare Workers, or
+  one configured for Vercel or Netlify — is marked and not offered a deploy.
   Clone from your GitHub account or any git URL, pull, fetch, install
   dependencies, or deploy one as an app. Long operations stream output live.
 - **Databases** — What this panel can reach, local or remote, each showing its
