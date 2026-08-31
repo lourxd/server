@@ -89,11 +89,7 @@ export async function probeCloudflareToken(token) {
       accountName: account?.name ?? null,
       zoneCount: Array.isArray(zones) ? zones.length : 0,
       needsAccountId: !account,
-      reason: account
-        ? Array.isArray(zones) && zones.length === 0
-          ? 'No zones are visible to this token, so a hostname cannot be routed yet. Add Zone · Zone · Read and Zone · DNS · Edit.'
-          : null
-        : 'The token works, but the panel could not work out which account to use — listing accounts needs Account · Account Settings · Read, which Cloudflare Tunnel · Edit does not include. Paste your Account ID below and everything else will work.',
+      reason: null,
     };
   } catch (err) {
     return { connected: false, reason: err.message };

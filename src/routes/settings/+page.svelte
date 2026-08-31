@@ -47,7 +47,6 @@
   import Download from '@lucide/svelte/icons/download';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
-  import Globe from '@lucide/svelte/icons/globe';
 
   let { data } = $props();
 
@@ -132,12 +131,6 @@
           : 'no account',
       icon: Cloud,
       lit: data.cloudflare.connected && !!data.config.cloudflareAccountId,
-    },
-    {
-      label: 'Your domain',
-      sub: cfNamed ? `${cfNamed} tunnel${cfNamed === 1 ? '' : 's'}` : 'no tunnel',
-      icon: Globe,
-      lit: cfNamed > 0,
     },
   ]);
 
@@ -714,17 +707,15 @@
 
             {#if !data.config.cloudflareAccountId}
               <p class="text-muted-foreground pl-[7.5rem] text-[11.5px]">
-                Found on your Cloudflare
+                Required — a tunnel is created under an account. The hex string in your
                 <a
                   href="https://dash.cloudflare.com"
                   target="_blank"
                   rel="noreferrer"
                   class="text-primary inline-flex items-center gap-1 hover:underline"
                 >
-                  Account Home<ExternalLink class="size-3" />
-                </a>
-                — the hex string in the dashboard URL. The panel fills this in itself when the token
-                can list accounts.
+                  Cloudflare dashboard URL<ExternalLink class="size-3" />
+                </a>.
               </p>
             {/if}
           </div>

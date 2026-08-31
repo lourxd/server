@@ -332,9 +332,9 @@ says nothing about whether a token can create a tunnel — never reject one on
 that basis, which briefly meant a good token was refused and the revoked one
 stayed. Resolve the account id from `/accounts`, fall back to any zone's
 `account.id`, and fall back again to an Account ID the user pastes; store the
-token whenever `/user/tokens/verify` passes. `zoneCount` is still worth
-reporting: a token that can make a tunnel but sees no zone cannot route a
-hostname to it.
+token whenever `/user/tokens/verify` passes. The account id is required — a
+tunnel is created under an account — so Settings asks for it plainly rather
+than explaining the permission quirk that made it necessary.
 
 **Cloudflare setup lives in Settings and nowhere else.** Network and an app's
 Network tab detect what is missing and link to `/settings?tab=cloudflare`; they
