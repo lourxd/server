@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { api, apiGet, live, toasts } from '$lib/live.svelte.js';
   import { cn } from '$lib/utils.js';
+  import { connectionEndpoint } from '$lib/format.js';
 
   import { Button } from '$lib/components/ui/button/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';

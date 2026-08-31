@@ -320,6 +320,14 @@ async, every call site must be audited for a missing `await`.
 deleted as unused because no *route* imported it — `select` imports it
 internally. Grep the whole tree, `ui/` included.
 
+**The build does not check identifiers used in markup.** A name referenced in a
+template but never imported compiles cleanly and throws `ReferenceError` at
+render — the page 500s and nothing before that says a word. `test/markup.test.js`
+walks every component, collects what the script declares (imports, `$props`
+destructuring, `{#each}` bindings, `{@const}`, snippets, arrow parameters) and
+fails on anything the markup references that is not there. It found a dangling
+`appTargets` in the quick-tunnel dialog that would have crashed that dialog.
+
 **A Rollup "not exported" warning is a runtime crash in waiting.** `disconnect`
 was called by `realtime.js` but not exported from `pm2.js`; the build succeeded
 and shutdown would have thrown.

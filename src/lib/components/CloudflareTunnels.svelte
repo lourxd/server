@@ -50,6 +50,7 @@
       .map((a) => ({ ...a, service: a.port ? `http://localhost:${a.port}` : null })),
   );
 
+  const runnable = $derived(targets.filter((a) => a.service));
   const chosenApp = $derived(targets.find((a) => a.service === route.service) ?? null);
   const routeValid = $derived(
     !!route.hostname.trim() && !!route.service.trim() && data.zones.length > 0,
@@ -343,15 +344,15 @@
         <div class="space-y-1.5">
           <Label for="tunnel-service">Local service</Label>
           <Input id="tunnel-service" bind:value={form.service} class="font-mono text-xs" />
-          {#if appTargets.length}
+          {#if runnable.length}
             <div class="flex flex-wrap gap-1.5 pt-1">
-              {#each appTargets as t (t.name)}
+              {#each runnable as app (app.pmId)}
                 <button
                   type="button"
-                  onclick={() => (form.service = t.service)}
+                  onclick={() => (form.service = app.service)}
                   class="panel hover:brightness-125 rounded-lg px-2 py-1 font-mono text-[10.5px]"
                 >
-                  {t.name}
+                  {app.name}
                 </button>
               {/each}
             </div>
