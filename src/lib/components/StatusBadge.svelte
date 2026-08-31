@@ -1,35 +1,20 @@
 <script>
   import { cn } from '$lib/utils.js';
+  import { describeStatus, TONE_CLASS } from '$lib/status.js';
 
-  let { status = 'unknown', class: className = '' } = $props();
+  let { status = 'unknown', activity = null, class: className = '' } = $props();
 
-  const TONE = {
-    online: 'bg-ok/14 text-ok',
-    healthy: 'bg-ok/14 text-ok',
-    active: 'bg-ok/14 text-ok',
-    streaming: 'bg-ok/14 text-ok',
-    launching: 'bg-warn/15 text-warn',
-    stopping: 'bg-warn/15 text-warn',
-    'waiting restart': 'bg-warn/15 text-warn',
-    errored: 'bg-bad/16 text-bad',
-    error: 'bg-bad/16 text-bad',
-  };
-
-  const LABEL = {
-    'waiting restart': 'restarting',
-    'one-launch-status': 'ran once',
-  };
-
-  const label = $derived(LABEL[status] ?? status);
+  const state = $derived(describeStatus(status, activity));
 </script>
 
 <span
   class={cn(
     'inline-flex h-6 max-w-full shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium',
-    TONE[status] ?? 'bg-foreground/7 text-idle',
+    TONE_CLASS[state.tone] ?? TONE_CLASS.idle,
     className,
   )}
+  title={state.raw && state.raw !== state.label ? state.raw : undefined}
 >
-  <span class="dot shrink-0"></span>
-  <span class="truncate" title={status}>{label}</span>
+  <span class={cn('dot shrink-0', state.busy && 'animate-pulse')}></span>
+  <span class="truncate">{state.label}</span>
 </span>

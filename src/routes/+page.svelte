@@ -160,7 +160,11 @@
                   <p class="text-muted-foreground truncate font-mono text-[11px]">{app.script ?? ''}</p>
                 </div>
               </div>
-              <StatusBadge status={app.status} class="justify-self-start" />
+              <StatusBadge
+                status={app.status}
+                activity={live.activityFor(app.name)}
+                class="justify-self-start"
+              />
               <p class="tabular hidden text-right text-[13px] sm:block">{app.cpu}%</p>
               <p class="tabular text-muted-foreground hidden text-right text-[13px] sm:block">
                 {bytes(app.memory)}

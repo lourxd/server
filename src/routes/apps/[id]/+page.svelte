@@ -240,7 +240,7 @@
   <div class="min-w-0">
     <div class="flex items-center gap-2.5">
       <h1 class="truncate text-[27px] font-semibold">{app.name}</h1>
-      <StatusBadge status={app.status} />
+      <StatusBadge status={app.status} activity={live.activityFor(app.name)} />
     </div>
     <p class="text-muted-foreground mt-0.5 truncate font-mono text-[11.5px]">
       {app.cwd ?? ''} · {app.execMode}{app.instances > 1 ? ` ×${app.instances}` : ''}

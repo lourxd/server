@@ -2,6 +2,7 @@ import * as metrics from './metrics.js';
 import * as pm2 from './pm2.js';
 import { shutdownAll } from './db/index.js';
 import { closeStore } from './store/index.js';
+import { activityBus, snapshot as activitySnapshot } from './activity.js';
 
 const clients = new Set();
 let started = false;
@@ -30,6 +31,10 @@ export function getRecentEvents() {
   return recentEvents;
 }
 
+export function getActivity() {
+  return activitySnapshot();
+}
+
 export function startRealtime({ intervalMs = 2000 } = {}) {
   if (started) return;
   started = true;
@@ -46,6 +51,8 @@ export function startRealtime({ intervalMs = 2000 } = {}) {
   });
 
   pm2.bus.on('log', (l) => broadcast('pm2:log', l));
+
+  activityBus.on('change', (map) => broadcast('activity', map));
 
   const tick = setInterval(async () => {
     if (clients.size === 0) return;

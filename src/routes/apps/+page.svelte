@@ -542,7 +542,9 @@
             </div>
           </div>
 
-          <div class="hidden md:block"><StatusBadge status={app.status} /></div>
+          <div class="hidden md:block">
+            <StatusBadge status={app.status} activity={live.activityFor(app.name)} />
+          </div>
 
           <div class="hidden md:block">
             <SparkBars

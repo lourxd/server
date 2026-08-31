@@ -5,6 +5,7 @@ class LiveState {
   metrics = $state(null);
   apps = $state([]);
   events = $state([]);
+  activity = $state({});
   lastError = $state(null);
 
   #source = null;
@@ -28,6 +29,7 @@ class LiveState {
 
     es.addEventListener('metrics', (e) => { this.metrics = JSON.parse(e.data); });
     es.addEventListener('apps', (e) => { this.apps = JSON.parse(e.data); });
+    es.addEventListener('activity', (e) => { this.activity = JSON.parse(e.data); });
 
     es.addEventListener('pm2:event', (e) => {
       const evt = JSON.parse(e.data);
@@ -48,6 +50,10 @@ class LiveState {
       this.lastError = `Disconnected — retrying in ${Math.round(delay / 1000)}s`;
       setTimeout(() => { if (!this.#source) this.#open(); }, delay);
     });
+  }
+
+  activityFor(name) {
+    return this.activity[name] ?? null;
   }
 
   onLog(fn) {
