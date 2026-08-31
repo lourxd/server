@@ -97,6 +97,7 @@ export async function publicSettings() {
     githubUser: s.githubUser,
     hasGithubToken: !!s.githubToken,
     hasCloudflareToken: !!s.cloudflareToken,
+    cloudflareTokenTail: s.cloudflareToken ? s.cloudflareToken.slice(-4) : null,
     cloudflareAccountId: s.cloudflareAccountId,
     theme: s.theme,
   };

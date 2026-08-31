@@ -108,7 +108,12 @@
   ]);
 
   const cfNamed = $derived(data.tunnels.filter((t) => t.kind === 'named').length);
-  const cfReady = $derived(data.cloudflare.connected && data.binary.installed);
+  const cfReady = $derived(
+    data.cloudflare.connected && !!data.config.cloudflareAccountId && data.binary.installed,
+  );
+
+  let editingToken = $state(false);
+  let editingAccount = $state(false);
 
   const cfHops = $derived([
     { label: 'This machine', sub: 'panel running', icon: Server, lit: true },
@@ -120,9 +125,13 @@
     },
     {
       label: 'Cloudflare',
-      sub: data.cloudflare.connected ? (data.cloudflare.accountName ?? 'connected') : 'no token',
+      sub: !data.cloudflare.connected
+        ? 'no token'
+        : data.config.cloudflareAccountId
+          ? (data.cloudflare.accountName ?? 'account set')
+          : 'no account',
       icon: Cloud,
-      lit: data.cloudflare.connected,
+      lit: data.cloudflare.connected && !!data.config.cloudflareAccountId,
     },
     {
       label: 'Your domain',
@@ -140,6 +149,7 @@
     try {
       await api('/api/settings', { action: 'cloudflare-account', accountId: cfAccountId.trim() });
       toasts.ok('Account saved');
+      editingAccount = false;
       await invalidateAll();
     } finally {
       savingCfAccount = false;
@@ -225,6 +235,7 @@
     try {
       const res = await api('/api/settings', { action: 'cloudflare-token', token: cfToken });
       cfToken = '';
+      editingToken = false;
       toasts.ok('Cloudflare connected', res.cloudflare.accountName ?? 'token verified');
       await invalidateAll();
     } catch {
@@ -585,67 +596,57 @@
 
         <div class="bg-border h-px"></div>
 
-        <div class="space-y-3.5">
-          <div class="space-y-2">
-            <div class="flex flex-wrap items-center gap-2">
-              <p class="text-[13px] font-medium">API token</p>
-              {#if data.cloudflare.connected}
-                <Badge variant="outline" class="border-ok/40 text-ok gap-1.5">
-                  <span class="dot"></span>{data.cloudflare.accountName ?? 'connected'}
-                </Badge>
+        <div class="divide-border divide-y">
+          <div class="space-y-2.5 py-3.5 first:pt-0">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <p class="w-28 shrink-0 text-[13px] font-medium">API token</p>
+              {#if data.cloudflare.connected && !editingToken}
+                <span class="text-muted-foreground min-w-0 flex-1 truncate font-mono text-[11.5px]">
+                  {data.cloudflare.accountName ?? 'valid'} · ends {data.config.cloudflareTokenTail ?? '····'}
+                </span>
+                <Button variant="ghost" size="sm" class="h-7 shrink-0 rounded-lg" onclick={() => (editingToken = true)}>
+                  Change
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  class="ml-auto h-7 rounded-lg"
+                  class="text-bad hover:text-bad h-7 shrink-0 rounded-lg"
                   onclick={disconnectCloudflare}
                 >
-                  <Link2Off class="size-3.5" /> Disconnect
+                  <Link2Off class="size-3.5" />
                 </Button>
+              {:else}
+                <div class="flex min-w-0 flex-1 gap-2">
+                  <Input
+                    type="password"
+                    bind:value={cfToken}
+                    placeholder="Paste the token"
+                    autocomplete="off"
+                    class="font-mono text-xs"
+                  />
+                  <Button
+                    class="accent-fill shrink-0 rounded-xl px-4 font-semibold"
+                    disabled={savingCf || !cfToken.trim()}
+                    onclick={saveCloudflare}
+                  >
+                    {savingCf ? 'Verifying…' : 'Save'}
+                  </Button>
+                  {#if data.cloudflare.connected}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="h-8.5 shrink-0 rounded-lg"
+                      onclick={() => ((editingToken = false), (cfToken = ''))}
+                    >
+                      Cancel
+                    </Button>
+                  {/if}
+                </div>
               {/if}
             </div>
 
-            {#if data.cloudflare.connected}
-              {#if data.cloudflare.accountId}
-                <p class="text-muted-foreground font-mono text-[11px] break-all">
-                  {data.cloudflare.accountId}
-                </p>
-              {/if}
-
-              {#if data.cloudflare.reason}
-                <Alert.Root>
-                  <CircleAlert class="size-4" />
-                  <Alert.Description class="text-xs">{data.cloudflare.reason}</Alert.Description>
-                </Alert.Root>
-              {/if}
-
-              {#if !data.cloudflare.accountId}
-                <div class="space-y-1.5">
-                  <Label for="cf-account">Account ID</Label>
-                  <div class="flex gap-2">
-                    <Input
-                      id="cf-account"
-                      bind:value={cfAccountId}
-                      placeholder="32 hexadecimal characters"
-                      spellcheck="false"
-                      class="font-mono text-xs"
-                    />
-                    <Button
-                      class="accent-fill shrink-0 rounded-xl px-4 font-semibold"
-                      disabled={savingCfAccount || !cfAccountId.trim()}
-                      onclick={saveCloudflareAccount}
-                    >
-                      {savingCfAccount ? 'Saving…' : 'Save'}
-                    </Button>
-                  </div>
-                  <p class="text-muted-foreground text-[11.5px]">
-                    Cloudflare dashboard → your account → the ID under
-                    <span class="font-mono">Account Home</span>, or the hex string in the dashboard
-                    URL after <span class="font-mono">/</span>.
-                  </p>
-                </div>
-              {/if}
-            {:else}
-              <p class="text-muted-foreground text-[11.5px]">
+            {#if !data.cloudflare.connected && !data.config.hasCloudflareToken}
+              <p class="text-muted-foreground pl-[7.5rem] text-[11.5px]">
                 Needs <span class="font-mono">Tunnel·Edit</span>,
                 <span class="font-mono">DNS·Edit</span> and <span class="font-mono">Zone·Read</span>.
                 <a
@@ -657,79 +658,117 @@
                   Create one<ExternalLink class="size-3" />
                 </a>
               </p>
+            {/if}
 
-              {#if data.cloudflare.reason && data.cloudflare.reason !== 'No Cloudflare API token configured.'}
-                <Alert.Root variant="destructive">
-                  <CircleAlert class="size-4" />
-                  <Alert.Description>{data.cloudflare.reason}</Alert.Description>
-                </Alert.Root>
-              {/if}
+            {#if data.cloudflare.reason && data.cloudflare.reason !== 'No Cloudflare API token configured.'}
+              <Alert.Root variant={data.cloudflare.connected ? 'default' : 'destructive'}>
+                <CircleAlert class="size-4" />
+                <Alert.Description class="text-xs">{data.cloudflare.reason}</Alert.Description>
+              </Alert.Root>
+            {/if}
+          </div>
 
-              <div class="flex gap-2">
-                <Input
-                  type="password"
-                  bind:value={cfToken}
-                  placeholder="Paste the token"
-                  autocomplete="off"
-                  class="font-mono text-xs"
-                />
+          <div class="space-y-2.5 py-3.5">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <p class="w-28 shrink-0 text-[13px] font-medium">Account</p>
+              {#if data.config.cloudflareAccountId && !editingAccount}
+                <span class="text-muted-foreground min-w-0 flex-1 truncate font-mono text-[11.5px]">
+                  {data.cloudflare.accountName ?? data.config.cloudflareAccountId}
+                </span>
                 <Button
-                  class="accent-fill shrink-0 rounded-xl px-4 font-semibold"
-                  disabled={savingCf || !cfToken.trim()}
-                  onclick={saveCloudflare}
+                  variant="ghost"
+                  size="sm"
+                  class="h-7 shrink-0 rounded-lg"
+                  onclick={() => ((cfAccountId = data.config.cloudflareAccountId), (editingAccount = true))}
                 >
-                  <Plug class="size-4" />
-                  {savingCf ? 'Verifying…' : 'Connect'}
+                  Change
                 </Button>
-              </div>
-            {/if}
-          </div>
-
-          <div class="flex flex-wrap items-center gap-3">
-            <div class="min-w-0 flex-1">
-              <p class="text-[13px] font-medium">cloudflared</p>
-              <p class="text-muted-foreground mt-0.5 text-[11.5px]">
-                {#if data.binary.installed}
-                  <span class="font-mono">{data.binary.version}</span> ·
-                  <span class="font-mono">{data.binary.path}</span>
-                {:else}
-                  Static binary into <span class="font-mono">~/.local/bin</span>. No sudo, nothing
-                  system-wide.
-                {/if}
-              </p>
+              {:else}
+                <div class="flex min-w-0 flex-1 gap-2">
+                  <Input
+                    bind:value={cfAccountId}
+                    placeholder="32 hexadecimal characters"
+                    spellcheck="false"
+                    class="font-mono text-xs"
+                  />
+                  <Button
+                    class="accent-fill shrink-0 rounded-xl px-4 font-semibold"
+                    disabled={savingCfAccount || !cfAccountId.trim()}
+                    onclick={saveCloudflareAccount}
+                  >
+                    {savingCfAccount ? 'Saving…' : 'Save'}
+                  </Button>
+                  {#if data.config.cloudflareAccountId}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="h-8.5 shrink-0 rounded-lg"
+                      onclick={() => (editingAccount = false)}
+                    >
+                      Cancel
+                    </Button>
+                  {/if}
+                </div>
+              {/if}
             </div>
-            {#if !data.binary.installed}
-              <Button
-                variant="ghost"
-                size="sm"
-                class="panel h-8.5 shrink-0 rounded-xl px-4"
-                disabled={installingCf}
-                onclick={installCloudflared}
-              >
-                {#if installingCf}
-                  <LoaderCircle class="size-3.5 animate-spin" />
-                {:else}
-                  <Download class="size-3.5" />
-                {/if}
-                {installingCf ? 'Installing…' : 'Install'}
-              </Button>
+
+            {#if !data.config.cloudflareAccountId}
+              <p class="text-muted-foreground pl-[7.5rem] text-[11.5px]">
+                Found on your Cloudflare
+                <a
+                  href="https://dash.cloudflare.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="text-primary inline-flex items-center gap-1 hover:underline"
+                >
+                  Account Home<ExternalLink class="size-3" />
+                </a>
+                — the hex string in the dashboard URL. The panel fills this in itself when the token
+                can list accounts.
+              </p>
             {/if}
           </div>
 
-          {#if cfInstallLines.length && !data.binary.installed}
-            <LogStream lines={cfInstallLines} height="200px" />
-          {/if}
+          <div class="space-y-2.5 py-3.5">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <p class="w-28 shrink-0 text-[13px] font-medium">cloudflared</p>
+              <span class="text-muted-foreground min-w-0 flex-1 truncate font-mono text-[11.5px]">
+                {#if data.binary.installed}
+                  {data.binary.version}
+                {:else}
+                  not installed · downloads to ~/.local/bin, no sudo
+                {/if}
+              </span>
+              {#if !data.binary.installed}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="panel h-8 shrink-0 rounded-lg px-3"
+                  disabled={installingCf}
+                  onclick={installCloudflared}
+                >
+                  {#if installingCf}
+                    <LoaderCircle class="size-3.5 animate-spin" />
+                  {:else}
+                    <Download class="size-3.5" />
+                  {/if}
+                  {installingCf ? 'Installing…' : 'Install'}
+                </Button>
+              {/if}
+            </div>
+
+            {#if cfInstallLines.length && !data.binary.installed}
+              <LogStream lines={cfInstallLines} height="200px" />
+            {/if}
+          </div>
 
           {#if cfReady}
-            <div class="flex flex-wrap items-center gap-3">
-              <div class="min-w-0 flex-1">
-                <p class="text-[13px] font-medium">Tunnels</p>
-                <p class="text-muted-foreground mt-0.5 text-[11.5px]">
-                  {cfNamed} named tunnel{cfNamed === 1 ? '' : 's'} · route a hostname from an app's
-                  Network tab.
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" class="panel h-8.5 shrink-0 rounded-xl px-4" href="/network">
+            <div class="flex flex-wrap items-center gap-2.5 py-3.5">
+              <p class="w-28 shrink-0 text-[13px] font-medium">Tunnels</p>
+              <span class="text-muted-foreground min-w-0 flex-1 truncate font-mono text-[11.5px]">
+                {cfNamed} named · route a hostname from an app's Network tab
+              </span>
+              <Button variant="ghost" size="sm" class="panel h-8 shrink-0 rounded-lg px-3" href="/network">
                 Open Network <ArrowRight class="size-3.5" />
               </Button>
             </div>
