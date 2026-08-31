@@ -8,7 +8,7 @@ import { db, schema } from '../store/index.js';
 import { encrypt, decrypt } from '../store/settings.js';
 import { cf, cfList, accountId, CloudflareError } from './api.js';
 import { upsertRecord, deleteRecord, listZones } from './dns.js';
-import { run, runStreaming } from '../exec.js';
+import { run, runStreaming, which as whichBinary } from '../exec.js';
 import { cached, invalidate } from '../cache.js';
 import * as pm2 from '../pm2.js';
 
@@ -26,8 +26,7 @@ const TUNNEL_CNAME_SUFFIX = 'cfargotunnel.com';
 
 export function binaryStatus() {
   return cached('cf:cloudflared', 30_000, async () => {
-    const which = await run('sh', ['-c', 'command -v cloudflared || true'], { timeout: 5000 });
-    const binPath = which.stdout.trim();
+    const binPath = whichBinary('cloudflared');
     if (!binPath) {
       return { installed: false, path: null, version: null, installHint: installHint() };
     }

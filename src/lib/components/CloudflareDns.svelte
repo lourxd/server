@@ -23,9 +23,9 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import CircleAlert from '@lucide/svelte/icons/circle-alert';
   import ShieldCheck from '@lucide/svelte/icons/shield-check';
+  import { RECORD_TYPES as TYPES, isProxyable } from '$lib/dns-records.js';
 
-  const TYPES = ['A', 'AAAA', 'CNAME', 'TXT', 'MX', 'NS', 'SRV', 'CAA'];
-  const PROXYABLE = new Set(['A', 'AAAA', 'CNAME']);
+
 
   let { data } = $props();
 
@@ -115,7 +115,7 @@
       name: form.name.trim(),
       content: form.content.trim(),
       ttl: Number(form.ttl) || 1,
-      proxied: PROXYABLE.has(form.type) ? form.proxied : false,
+      proxied: isProxyable(form.type) ? form.proxied : false,
     };
     await api('/api/dns', editing ? { action: 'update', recordId: editing.id, ...payload } : { action: 'create', ...payload });
     toasts.ok(editing ? 'Record updated' : 'Record created', payload.name);
@@ -365,7 +365,7 @@
           <Label for="rec-ttl">TTL</Label>
           <Input id="rec-ttl" type="number" bind:value={form.ttl} class="font-mono text-xs" />
         </div>
-        {#if PROXYABLE.has(form.type)}
+        {#if isProxyable(form.type)}
           <div class="flex items-center gap-2 pb-2">
             <Checkbox id="rec-proxy" bind:checked={form.proxied} />
             <Label for="rec-proxy" class="font-normal">Proxy through Cloudflare</Label>

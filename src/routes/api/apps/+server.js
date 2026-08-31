@@ -183,7 +183,7 @@ async function updateEnv(body) {
     return { ok: true, restarted: true, result };
   } catch (err) {
     try {
-      await startProcess({ ...rebuilt, envVars: undefined, env: proc.env });
+      await startProcess({ ...rebuilt, envVars: undefined, env: pm2.appEnv(proc.env) });
     } catch {
     }
     error(500, `Could not restart ${proc.name} with the new environment: ${err?.body?.message ?? err.message}`);
@@ -199,11 +199,20 @@ async function startProcess(body) {
     return pm2.startFromFile(file);
   }
 
-  const split = splitEnv(body.envVars, readEnvFile(cwd));
+  let split;
+  try {
+    split = splitEnv(body.envVars, readEnvFile(cwd));
+  } catch (err) {
+    error(400, err.message);
+  }
   const env = Array.isArray(body.envVars) ? split.plain : (parseEnv(body.env) ?? {});
   const secrets = split.secret;
   if (Array.isArray(body.envVars) && (Object.keys(secrets).length || fs.existsSync(path.join(cwd, '.env')))) {
-    writeEnvFile(cwd, secrets);
+    try {
+      writeEnvFile(cwd, secrets);
+    } catch (err) {
+      error(400, err.message);
+    }
   }
   if (body.stack && /^[a-z0-9-]{1,32}$/.test(body.stack)) env.SCP_STACK = body.stack;
   if (body.registerOnly) {

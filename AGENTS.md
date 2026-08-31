@@ -227,9 +227,11 @@ It is honest, not finished. Do not present it as designed.
 
 Break any of these and the panel becomes a remote shell for the internet.
 
-- **Argv arrays, never shell strings.** `exec.js` spawns with `shell: false`.
-  There is no code path in this repo that interpolates user input into a shell
-  command, and there must not be one.
+- **Argv arrays, never shell strings.** `exec.js` spawns with `shell: false`,
+  and there is no `sh -c` left in the tree: `which()` scans `PATH` in Node and
+  refuses anything that is not a bare binary name, so even binary lookups avoid
+  a shell. No code path interpolates user input into a shell command, and none
+  should.
 - **`safeRepoPath()` gates every filesystem path** derived from a request. It
   refuses `..` traversal and absolute paths, and confines everything to the
   projects directory.

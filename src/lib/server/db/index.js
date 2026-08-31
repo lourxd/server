@@ -4,7 +4,7 @@ import * as sqlite from './sqlite.js';
 import * as redis from './redis.js';
 import * as mongo from './mongo.js';
 import * as store from '../store/connections.js';
-import { run } from '../exec.js';
+import { run, which as whichBinary } from '../exec.js';
 import { cached, invalidate } from '../cache.js';
 
 export const DRIVERS = {
@@ -153,8 +153,8 @@ async function detectLocalEnginesUncached() {
 
   const results = await Promise.all(
     ENGINE_PROBES.map(async (probe2) => {
-      const which = await run('sh', ['-c', `command -v ${probe2.bin} || true`], { timeout: 5000 });
-      const installed = !!which.stdout.trim();
+      const binaryPath = whichBinary(probe2.bin);
+      const installed = !!binaryPath;
       let serviceState = null;
       if (probe2.service) {
         const st = await run('systemctl', ['is-active', probe2.service], { timeout: 5000 });
@@ -165,7 +165,7 @@ async function detectLocalEnginesUncached() {
         label: DRIVER_META[probe2.type].label,
         binary: probe2.bin,
         installed,
-        binaryPath: which.stdout.trim() || null,
+        binaryPath,
         service: probe2.service,
         serviceState,
         port: probe2.port,

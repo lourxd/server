@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import fs from 'node:fs';
 
 const NODE_BIN_DIR = path.dirname(process.execPath);
 
@@ -16,6 +17,20 @@ function childEnv(env) {
   }
   merged.PATH = withNodeOnPath(merged.PATH);
   return merged;
+}
+
+export function which(binary) {
+  if (!/^[A-Za-z0-9._-]+$/.test(String(binary ?? ''))) return null;
+  const dirs = withNodeOnPath(process.env.PATH).split(path.delimiter).filter(Boolean);
+  for (const dir of dirs) {
+    const candidate = path.join(dir, binary);
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+    }
+  }
+  return null;
 }
 
 export function run(cmd, args = [], opts = {}) {

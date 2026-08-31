@@ -2,13 +2,9 @@ import dns from 'node:dns/promises';
 import { cf, cfList } from './api.js';
 import { cached, invalidate } from '../cache.js';
 
-export const RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'TXT', 'MX', 'NS', 'SRV', 'CAA'];
+import { RECORD_TYPES, isProxyable } from '$lib/dns-records.js';
 
-const PROXYABLE = new Set(['A', 'AAAA', 'CNAME']);
-
-export function isProxyable(type) {
-  return PROXYABLE.has(type);
-}
+export { RECORD_TYPES, isProxyable };
 
 export function listZones() {
   return cached('cf:zones', 60_000, async () => {

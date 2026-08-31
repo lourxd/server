@@ -16,7 +16,6 @@
   import TechLogo from '$lib/components/TechLogo.svelte';
   import Boxes from '@lucide/svelte/icons/boxes';
 
-  import PageHeader from '$lib/components/PageHeader.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import LogStream from '$lib/components/LogStream.svelte';
