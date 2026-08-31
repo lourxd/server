@@ -87,13 +87,6 @@ export async function POST({ request, locals, getClientAddress }) {
         return json({ ok: true, github: await fresh() });
       }
 
-      case 'allow-signup': {
-        const value = !!body.value;
-        await setSetting('allowSignUp', value);
-        audit('settings.allowSignUp', String(value));
-        return json({ ok: true, allowSignUp: value });
-      }
-
       default:
         error(400, `Unknown action: ${body.action}`);
     }

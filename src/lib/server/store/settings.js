@@ -47,7 +47,6 @@ const DEFAULTS = {
   githubUser: '',
   cloudflareToken: '',
   cloudflareAccountId: '',
-  allowSignUp: false,
   theme: 'dark',
 };
 
@@ -99,7 +98,6 @@ export async function publicSettings() {
     hasGithubToken: !!s.githubToken,
     hasCloudflareToken: !!s.cloudflareToken,
     cloudflareAccountId: s.cloudflareAccountId,
-    allowSignUp: !!s.allowSignUp,
     theme: s.theme,
   };
 }

@@ -7,7 +7,6 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { sqlite as db, DATA_DIR } from './store/index.js';
-import { settings } from './store/settings.js';
 
 const SECRET_FILE = path.join(DATA_DIR, 'auth.secret');
 
@@ -35,10 +34,6 @@ export function needsSetup() {
     return false;
   }
   return true;
-}
-
-export function allowsSignUp() {
-  return !!settings().allowSignUp;
 }
 
 export const auth = betterAuth({
@@ -83,11 +78,10 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          if (userCount() === 0) return { data: { ...user, role: 'admin' } };
-          if (!allowsSignUp()) {
-            throw new Error('Sign-ups are disabled. An administrator must create your account.');
+          if (userCount() > 0) {
+            throw new Error('Sign-ups are closed. An administrator must create your account.');
           }
-          return { data: user };
+          return { data: { ...user, role: 'admin' } };
         },
       },
     },

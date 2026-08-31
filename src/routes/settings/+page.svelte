@@ -36,7 +36,6 @@
   import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
   import HardDrive from '@lucide/svelte/icons/hard-drive';
   import KeyRound from '@lucide/svelte/icons/key-round';
-  import ShieldCheck from '@lucide/svelte/icons/shield-check';
   import History from '@lucide/svelte/icons/clock-fading';
   import Link2Off from '@lucide/svelte/icons/link-2-off';
   import Plug from '@lucide/svelte/icons/plug';
@@ -172,11 +171,6 @@
     await invalidateAll();
   }
 
-  async function toggleSignUp(value) {
-    await api('/api/settings', { action: 'allow-signup', value });
-    toasts.ok(value ? 'Sign-ups enabled' : 'Sign-ups disabled');
-    await invalidateAll();
-  }
 
   async function changePassword() {
     pwBusy = true;
@@ -684,40 +678,6 @@
         </Card.Root>
       {/if}
 
-      {#if data.isAdmin}
-        <Card.Root>
-          <Card.Header>
-            <Card.Title class="flex items-center gap-2 text-base"><ShieldCheck class="text-muted-foreground size-4" /> Open sign-up</Card.Title>
-          </Card.Header>
-          <Card.Content class="space-y-3">
-            <div class="flex items-center gap-2">
-              <Checkbox
-                id="allow-signup"
-                checked={data.config.allowSignUp}
-                onCheckedChange={(v) => toggleSignUp(!!v)}
-              />
-              <Label for="allow-signup" class="font-normal">
-                Let anyone who can reach this panel create an account
-              </Label>
-            </div>
-            <Alert.Root variant={data.config.allowSignUp ? 'destructive' : 'default'}>
-              {#if data.config.allowSignUp}
-                <TriangleAlert class="size-4" />
-                <Alert.Description>
-                  Sign-ups are <strong>open</strong>. Anyone who can reach this URL can register and then
-                  control apps, repositories and databases on this machine. Leave this off unless the
-                  panel sits behind a VPN or trusted network.
-                </Alert.Description>
-              {:else}
-                <Alert.Description>
-                  Sign-ups are closed. Only an administrator can add accounts, which is the right setting
-                  for a panel with server control.
-                </Alert.Description>
-              {/if}
-            </Alert.Root>
-          </Card.Content>
-        </Card.Root>
-      {/if}
     </Tabs.Content>
   </Tabs.Root>
 </div>

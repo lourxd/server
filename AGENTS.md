@@ -243,6 +243,11 @@ Break any of these and the panel becomes a remote shell for the internet.
   `data/secret.key` (0600), *beside* the database rather than inside it, so a
   copied `panel.db` is not sufficient. Tokens are never returned to the browser
   after saving, and are redacted from streamed command output.
+- **There is no way to reopen sign-ups.** The first account becomes the admin;
+  every later `sign-up/email` is refused in a Better Auth `databaseHooks.user`
+  hook, with no setting behind it. A panel that can start processes and read
+  databases should never have a self-service registration switch a stray click
+  can flip.
 - **Sign-in is rate limited per IP.** The real socket address is stamped onto
   every `/api/auth` request by the route handler, overwriting any
   client-supplied header. Do not trust `x-forwarded-for` here.

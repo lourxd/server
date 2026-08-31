@@ -226,8 +226,9 @@ services to the internet. Treat access to it as equivalent to a shell.
 
 - Every route except `/login`, `/setup` and `/api/auth` requires a session; API
   routes return `401 JSON` rather than redirecting.
-- Sign-ups close after the first account. The "open sign-up" toggle is off by
-  default and warns when enabled.
+- Sign-ups close permanently after the first account, and there is no setting
+  that reopens them. Only an administrator can add accounts, from Settings →
+  Users.
 - Sign-in is rate limited to 8 attempts per minute **per IP**. The real socket
   address is stamped onto every `/api/auth` request by the route handler,
   overwriting any client-supplied header so it cannot be spoofed.
