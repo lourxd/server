@@ -2,7 +2,7 @@ import dns from 'node:dns/promises';
 import { cf, cfList } from './api.js';
 import { cached, invalidate } from '../cache.js';
 
-import { RECORD_TYPES, isProxyable } from '$lib/dns-records.js';
+import { RECORD_TYPES, isProxyable } from '../../dns-records.js';
 
 export { RECORD_TYPES, isProxyable };
 

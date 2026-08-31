@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { ENV_KEY_RE, parseEnvText } from '../env-format.js';
 
-export const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export { ENV_KEY_RE };
 
 export const MARKERS = {
   stack: 'SCP_STACK',
@@ -49,25 +50,7 @@ export function envFileBody(vars) {
 }
 
 export function parseEnvFile(text) {
-  const out = {};
-  for (const raw of String(text ?? '').split('\n')) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-    const eq = line.indexOf('=');
-    if (eq < 1) continue;
-
-    const key = line.slice(0, eq).replace(/^export\s+/, '').trim();
-    if (!key) continue;
-
-    let value = line.slice(eq + 1).trim();
-    if (value.startsWith('"') && value.endsWith('"') && value.length > 1) {
-      value = value.slice(1, -1).replace(/\\(["\\$`])/g, '$1');
-    } else if (value.startsWith("'") && value.endsWith("'") && value.length > 1) {
-      value = value.slice(1, -1);
-    }
-    out[key] = value;
-  }
-  return out;
+  return Object.fromEntries(parseEnvText(text).map((r) => [r.key, r.value]));
 }
 
 export function readEnvFile(cwd) {

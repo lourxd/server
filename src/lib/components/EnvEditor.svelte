@@ -1,5 +1,6 @@
 <script>
   import { cn } from '$lib/utils.js';
+  import { parseEnvText } from '$lib/env-format.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
@@ -20,10 +21,16 @@
 
   let adding = $state(false);
   let draft = $state({ key: '', value: '', secret: false });
+  const parsed = $derived(parseEnvText(pasteText));
+  const usable = $derived(parsed.filter((r) => r.valid));
+  const rejected = $derived(parsed.filter((r) => !r.valid));
+  const existing = $derived(new Set(vars.map((v) => v.key)));
+
   const taken = $derived(vars.some((v) => v.key === draft.key.trim()) && !!draft.key.trim());
   const suggestSecret = $derived(!draft.secret && SECRET_HINT.test(draft.key));
 
   let pasting = $state(false);
+  let parsedOverrides = $state({});
   let pasteText = $state('');
   let revealed = $state(new Set());
 
@@ -77,29 +84,24 @@
     revealed = next;
   }
 
+  function togglePasted(i) {
+    parsedOverrides = { ...parsedOverrides, [i]: !kindOf(i) };
+  }
+
+  const kindOf = (i) => parsedOverrides[i] ?? parsed[i]?.secret ?? false;
+
   function applyPaste() {
-    const parsed = [];
-    for (const raw of pasteText.split('\n')) {
-      const line = raw.trim();
-      if (!line || line.startsWith('#')) continue;
-      const eq = line.indexOf('=');
-      if (eq < 1) continue;
-      const key = line.slice(0, eq).trim().replace(/^export\s+/, '');
-      let value = line.slice(eq + 1).trim();
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-      if (!key) continue;
-      parsed.push({ key, value, secret: SECRET_HINT.test(key) });
-    }
-    if (!parsed.length) return;
-    const byKey = new Map(vars.filter((v) => v.key).map((v) => [v.key, v]));
-    for (const p of parsed) byKey.set(p.key, p);
-    vars = [...byKey.values()];
+    const incoming = usable.map((row) => ({
+      key: row.key,
+      value: row.value,
+      secret: kindOf(parsed.indexOf(row)),
+    }));
+    if (!incoming.length) return;
+
+    const keys = new Set(incoming.map((r) => r.key));
+    vars = [...vars.filter((v) => !keys.has(v.key)), ...incoming];
     pasteText = '';
+    parsedOverrides = {};
     pasting = false;
   }
 </script>
@@ -113,7 +115,12 @@
       </span>
     {/if}
     <div class="ml-auto flex items-center gap-1.5">
-      <Button variant="ghost" size="sm" class="h-7 rounded-lg" onclick={() => (pasting = !pasting)}>
+      <Button
+        variant="ghost"
+        size="sm"
+        class="h-7 rounded-lg"
+        onclick={() => ((pasteText = ''), (parsedOverrides = {}), (pasting = true))}
+      >
         <ClipboardPaste class="size-3.5" /> Paste .env
       </Button>
       <Button variant="outline" size="sm" class="h-7 rounded-lg" onclick={openAdd}>
@@ -121,26 +128,6 @@
       </Button>
     </div>
   </div>
-
-  {#if pasting}
-    <div class="panel space-y-2 rounded-xl p-3">
-      <Textarea
-        bind:value={pasteText}
-        rows={5}
-        spellcheck="false"
-        placeholder={'DATABASE_URL=postgres://…\nSTRIPE_SECRET_KEY=sk_live_…\n# comments and `export` are ignored'}
-        class="font-mono text-[11.5px]"
-      />
-      <div class="flex justify-end gap-1.5">
-        <Button variant="ghost" size="sm" class="h-7" onclick={() => ((pasting = false), (pasteText = ''))}>
-          Cancel
-        </Button>
-        <Button size="sm" class="accent-fill h-7 rounded-lg px-3 font-semibold" onclick={applyPaste}>
-          Add these
-        </Button>
-      </div>
-    </div>
-  {/if}
 
   {#if !vars.length}
     <button
@@ -318,6 +305,94 @@
         onclick={commitAdd}
       >
         <Plus class="size-4" /> Add
+      </Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={pasting}>
+  <Dialog.Content class="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
+    <Dialog.Header>
+      <Dialog.Title>Paste a .env file</Dialog.Title>
+      <Dialog.Description>
+        Comments, blank lines, <code class="font-mono">export</code> and quoting are handled. Anything
+        that looks like a credential is marked secret — check before adding.
+      </Dialog.Description>
+    </Dialog.Header>
+
+    <div class="space-y-3.5">
+      <Textarea
+        bind:value={pasteText}
+        rows={6}
+        spellcheck="false"
+        placeholder={'DATABASE_URL=postgres://…\nexport STRIPE_SECRET_KEY="sk_live_…"\nPORT=3000'}
+        class="font-mono text-[11.5px]"
+      />
+
+      {#if parsed.length}
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="eyebrow">{usable.length} variable{usable.length === 1 ? '' : 's'}</span>
+          {#if usable.filter((r) => kindOf(parsed.indexOf(r))).length}
+            <span class="accent-wash tabular rounded-full px-2 py-0.5 font-mono text-[10px]">
+              {usable.filter((r) => kindOf(parsed.indexOf(r))).length} secret
+            </span>
+          {/if}
+          {#if rejected.length}
+            <span class="bg-bad/16 text-bad tabular rounded-full px-2 py-0.5 font-mono text-[10px]">
+              {rejected.length} skipped
+            </span>
+          {/if}
+        </div>
+
+        <div class="panel max-h-72 space-y-1 overflow-y-auto rounded-xl p-2">
+          {#each parsed as row, i (row.key + i)}
+            {@const secret = kindOf(i)}
+            <div
+              class={cn(
+                'grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] items-center gap-2 rounded-lg px-2 py-1.5',
+                !row.valid && 'bg-bad/8',
+              )}
+            >
+              <span class="truncate font-mono text-[11.5px]">{row.key}</span>
+              <span class="text-muted-foreground truncate font-mono text-[11px]">
+                {secret ? '•'.repeat(Math.min(row.value.length, 16)) : row.value || '—'}
+              </span>
+
+              {#if row.valid}
+                <div class="flex items-center gap-1.5">
+                  {#if existing.has(row.key)}
+                    <span class="text-warn font-mono text-[9.5px]">replaces</span>
+                  {/if}
+                  <button
+                    type="button"
+                    onclick={() => togglePasted(i)}
+                    title={secret ? 'Secret — goes to .env' : 'Plain — goes to PM2'}
+                    class={cn(
+                      'flex items-center gap-1 rounded-md px-1.5 py-1 font-mono text-[9.5px] transition-colors',
+                      secret ? 'accent-wash text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {#if secret}<KeyRound class="size-3" /> secret{:else}<Hash class="size-3" /> plain{/if}
+                  </button>
+                </div>
+              {:else}
+                <span class="text-bad font-mono text-[9.5px]">not a valid name</span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+
+    <Dialog.Footer>
+      <Button variant="ghost" onclick={() => (pasting = false)}>Cancel</Button>
+      <Button
+        class="accent-fill rounded-xl px-4 font-semibold"
+        disabled={!usable.length}
+        onclick={applyPaste}
+      >
+        <Plus class="size-4" />
+        Add {usable.length || ''} variable{usable.length === 1 ? '' : 's'}
       </Button>
     </Dialog.Footer>
   </Dialog.Content>

@@ -74,6 +74,10 @@ round-tripping, status mapping, port probing, connection-string parsing and
 building, PM2 env sanitising and filtering, stack integrity, activity tracking,
 build logs and path safety.
 
+**Server modules import by relative path, never `$lib`.** The alias is Vite's,
+so a server module using it cannot be imported by `node --test`; `appenv.js` and
+`cloudflare/dns.js` both hit this. Components may use `$lib` freely.
+
 **Testable logic does not belong in a route.** `+server.js` files cannot be
 imported outside Vite, so anything in one is unreachable from a test. That is
 why `appenv.js` exists, and why `ports.js` takes the app list as an argument
