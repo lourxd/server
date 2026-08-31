@@ -146,6 +146,8 @@ export function shapeProcess(p) {
     createdAt: env.created_at || null,
     user: env.username || null,
     stack: env.env?.SCP_STACK ?? env.SCP_STACK ?? null,
+    dbId: env.env?.SCP_DB ?? env.SCP_DB ?? null,
+    dbVar: env.env?.SCP_DB_VAR ?? env.SCP_DB_VAR ?? null,
     gitRepo: env.versioning?.repo_path || null,
     gitBranch: env.versioning?.branch || null,
   };

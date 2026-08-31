@@ -1,6 +1,7 @@
 <script>
   import { invalidateAll } from '$app/navigation';
-  import { api, toasts } from '$lib/live.svelte.js';
+  import { onMount } from 'svelte';
+  import { api, apiGet, live, toasts } from '$lib/live.svelte.js';
   import { cn } from '$lib/utils.js';
 
   import { Button } from '$lib/components/ui/button/index.js';
@@ -19,10 +20,6 @@
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import Link2 from '@lucide/svelte/icons/link-2';
-  import Cloud from '@lucide/svelte/icons/cloud';
-  import Play from '@lucide/svelte/icons/play';
-  import Copy from '@lucide/svelte/icons/copy';
-  import Check from '@lucide/svelte/icons/check';
   import CircleAlert from '@lucide/svelte/icons/circle-alert';
 
   let { data } = $props();
@@ -33,8 +30,28 @@
   let creating = $state(false);
   let confirmOpen = $state(false);
   let removeTarget = $state(null);
-  let busy = $state(null);
-  let copied = $state(null);
+  let health = $state({});
+
+  const known = $derived(new Set(data.connections.map((c) => c.id)));
+  const appsUsing = (id) => live.apps.filter((a) => a.dbId === id);
+  const orphans = $derived(live.apps.filter((a) => a.dbId && !known.has(a.dbId)));
+
+  const endpoint = (conn) =>
+    conn.type === 'sqlite'
+      ? conn.file
+      : `${conn.host}:${conn.port}${conn.database ? ` / ${conn.database}` : ''}`;
+
+  onMount(() => {
+    for (const conn of data.connections) checkHealth(conn);
+  });
+
+  async function checkHealth(conn) {
+    try {
+      health = { ...health, [conn.id]: await apiGet('/api/db', { op: 'test', id: conn.id }, { quiet: true }) };
+    } catch (err) {
+      health = { ...health, [conn.id]: { ok: false, error: err.message } };
+    }
+  }
 
   let form = $state({ name: '', host: '127.0.0.1', port: '', user: '', password: '' });
   let mode = $state('create');
@@ -49,38 +66,10 @@
 
   const stateOf = (type) => data.engines.find((e) => e.type === type && e.installed) ?? null;
 
-  function statusOf(e, st) {
-    if (!e.needsServer) return { key: 'ready', label: 'built in', tone: 'var(--ok)' };
-    if (st?.listening) return { key: 'ready', label: `listening on ${e.defaultPort}`, tone: 'var(--ok)' };
-    if (st?.installed) return { key: 'stopped', label: 'installed, not running', tone: 'var(--warn)' };
-    return { key: 'missing', label: 'not installed', tone: 'var(--muted-foreground)' };
-  }
+  
 
-  const readyCount = $derived(
-    data.catalogue.filter((e) => statusOf(e, stateOf(e.type)).key === 'ready').length,
-  );
-
-  async function startEngine(e, st) {
-    busy = e.type;
-    try {
-      await api('/api/db', { action: 'service', service: st.service, serviceAction: 'start' });
-      toasts.ok(`${e.label} started`);
-      await invalidateAll();
-    } finally {
-      busy = null;
-    }
-  }
-
-  async function copyInstall(e) {
-    try {
-      await navigator.clipboard.writeText(e.install);
-      copied = e.type;
-      setTimeout(() => (copied = null), 1600);
-    } catch {
-      toasts.info('Install with', e.install);
-    }
-  }
-
+  
+  
   function openDialog(which = 'create') {
     mode = which;
     step = which === 'connect' ? 2 : 1;
@@ -147,6 +136,8 @@
   async function remove() {
     await api('/api/db', { action: 'delete', id: removeTarget.id });
     toasts.ok('Removed', removeTarget.name);
+    const { [removeTarget.id]: _gone, ...rest } = health;
+    health = rest;
     await invalidateAll();
   }
 </script>
@@ -164,7 +155,7 @@
   {/snippet}
 </PageHeader>
 
-<div class="flex flex-col gap-3.5 p-5 pt-3.5 md:p-6 md:pt-3.5">
+<div class="flex flex-col gap-4 p-5 pt-3.5 md:p-6 md:pt-3.5">
   {#if !data.connections.length}
     <div class="panel flex flex-col items-center gap-3 rounded-2xl px-6 py-16 text-center">
       <div class="panel grid size-12 place-items-center rounded-full">
@@ -186,112 +177,97 @@
       </div>
     </div>
   {:else}
-    <div class="grid gap-3 xl:grid-cols-2">
+    <div class="flex flex-col gap-2.5">
       {#each data.connections as conn (conn.id)}
         {@const meta = data.catalogue.find((e) => e.type === conn.type)}
-        <div class="panel-raised flex items-center gap-3.5 rounded-2xl p-4.5">
-          <div class="bg-foreground/6 grid size-10 shrink-0 place-items-center rounded-xl">
-            <TechLogo name={meta?.logo ?? 'sqlite'} class="size-5" />
+        {@const users = appsUsing(conn.id)}
+        {@const reach = health[conn.id]}
+        <div class="panel-raised flex flex-col gap-3.5 rounded-2xl p-4.5">
+          <div class="flex flex-wrap items-center gap-3.5">
+            <div class="bg-foreground/6 grid size-10 shrink-0 place-items-center rounded-xl">
+              <TechLogo name={meta?.logo ?? 'sqlite'} class="size-5" />
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <p class="truncate text-[15px] font-semibold">{conn.name}</p>
+                <Badge
+                  variant="outline"
+                  class={cn(
+                    'font-mono text-[10px]',
+                    conn.remote ? 'border-info/40 text-info' : 'text-muted-foreground',
+                  )}
+                >
+                  {conn.remote ? 'remote' : conn.type === 'sqlite' ? 'file' : 'local'}
+                </Badge>
+              </div>
+              <p class="text-muted-foreground truncate font-mono text-[11px]">{endpoint(conn)}</p>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-4">
+              <div class="text-right">
+                {#if !reach}
+                  <p class="text-muted-foreground flex items-center justify-end gap-1.5 font-mono text-[12px]">
+                    <LoaderCircle class="size-3 animate-spin" /> checking
+                  </p>
+                {:else}
+                  <p
+                    class="flex items-center justify-end gap-1.5 font-mono text-[12px]"
+                    style="color:{reach.ok ? 'var(--ok)' : 'var(--bad)'}"
+                    title={reach.ok ? (reach.version ?? '') : (reach.error ?? '')}
+                  >
+                    <span class="dot"></span>{reach.ok ? 'reachable' : 'unreachable'}
+                  </p>
+                {/if}
+                <p class="eyebrow mt-0.5">{meta?.label ?? conn.type}</p>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                class="bg-bad/10 text-bad hover:bg-bad/20 hover:text-bad size-8 rounded-lg"
+                onclick={() => askRemove(conn)}
+              >
+                <Trash2 class="size-3.5" />
+              </Button>
+            </div>
           </div>
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-[14.5px] font-semibold">{conn.name}</p>
-            <p class="text-muted-foreground truncate font-mono text-[10.5px]">
-              {conn.type === 'sqlite'
-                ? conn.file
-                : `${conn.host}:${conn.port}${conn.database ? ` / ${conn.database}` : ''}`}
-            </p>
-          </div>
-          <div class="flex shrink-0 items-center gap-1.5">
-            {#if conn.remote}
-              <Badge variant="outline" class="border-info/40 text-info gap-1.5 font-mono text-[10.5px]">
-                <Cloud class="size-3" /> remote
-              </Badge>
+
+          <div class="border-border/60 flex flex-wrap items-center gap-2 border-t pt-3">
+            <span class="eyebrow">Used by</span>
+            {#each users as app (app.pmId)}
+              <a
+                href="/apps/{app.pmId}"
+                class="panel hover:brightness-125 flex items-center gap-2 rounded-full px-2.5 py-1 font-mono text-[10.5px] transition-all"
+              >
+                <span class="dot" style="color:{app.status === 'online' ? 'var(--ok)' : 'var(--idle)'}"></span>
+                {app.name}
+                <span class="text-muted-foreground">{app.dbVar}</span>
+              </a>
+            {/each}
+            {#if !users.length}
+              <span class="text-muted-foreground text-[11.5px]">
+                Nothing yet — attach it from an app's Database tab.
+              </span>
             {/if}
-            <Badge variant="outline" class="font-mono text-[10.5px]">{meta?.label ?? conn.type}</Badge>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="hover:text-bad size-8 shrink-0 rounded-lg"
-            onclick={() => askRemove(conn)}
-          >
-            <Trash2 class="size-3.5" />
-          </Button>
         </div>
       {/each}
     </div>
   {/if}
 
-  <div class="space-y-3">
-    <div class="flex items-baseline gap-2">
-      <span class="eyebrow">Engines</span>
-      <span class="text-muted-foreground ml-auto font-mono text-[10.5px]">
-        {readyCount} of {data.catalogue.length} ready
-      </span>
-    </div>
+  {#if orphans.length}
+    <Alert.Root>
+      <CircleAlert class="size-4" />
+      <Alert.Description class="text-xs">
+        {orphans.map((a) => a.name).join(', ')}
+        {orphans.length === 1 ? 'points' : 'point'} at a database that is no longer here. The connection
+        string is still in the project's <code class="font-mono">.env</code> — detach it from the app, or
+        connect that database again.
+      </Alert.Description>
+    </Alert.Root>
+  {/if}
 
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {#each data.catalogue as e (e.type)}
-        {@const st = stateOf(e.type)}
-        {@const status = statusOf(e, st)}
-        <div
-          class={cn(
-            'flex items-center gap-3.5 rounded-2xl p-4',
-            status.key === 'ready' ? 'panel-raised' : 'panel',
-          )}
-        >
-          <div
-            class={cn(
-              'grid size-10 shrink-0 place-items-center rounded-xl',
-              status.key === 'ready' ? 'bg-foreground/8 text-foreground' : 'bg-foreground/4 text-foreground/40',
-            )}
-          >
-            <TechLogo name={e.logo} class="size-5" />
-          </div>
-
-          <div class="min-w-0 flex-1">
-            <p class={cn('truncate text-[13.5px] font-semibold', status.key !== 'ready' && 'text-foreground/70')}>
-              {e.label}
-            </p>
-            <p class="mt-0.5 flex items-center gap-1.5 font-mono text-[10.5px]" style="color:{status.tone}">
-              {#if status.key !== 'missing'}<span class="dot"></span>{/if}
-              {status.label}
-            </p>
-          </div>
-
-          {#if status.key === 'stopped'}
-            <Button
-              variant="ghost"
-              size="sm"
-              class="panel h-7.5 shrink-0 rounded-lg px-2.5 text-[11.5px]"
-              disabled={busy === e.type}
-              onclick={() => startEngine(e, st)}
-            >
-              {#if busy === e.type}
-                <LoaderCircle class="size-3.5 animate-spin" />
-              {:else}
-                <Play class="size-3.5" />
-              {/if}
-              Start
-            </Button>
-          {:else if status.key === 'missing'}
-            <button
-              type="button"
-              title="Copy install command"
-              onclick={() => copyInstall(e)}
-              class="panel text-muted-foreground hover:text-foreground flex h-7.5 shrink-0 items-center gap-1.5 rounded-lg px-2.5 font-mono text-[10.5px] transition-colors"
-            >
-              {#if copied === e.type}
-                <Check class="size-3.5" /> copied
-              {:else}
-                <Copy class="size-3.5" /> apt
-              {/if}
-            </button>
-          {/if}
-        </div>
-      {/each}
-    </div>
-  </div>
 </div>
 
 <Dialog.Root bind:open>

@@ -165,7 +165,9 @@ and reconnects to the daemon on its own.
   ahead/behind, uncommitted count, last commit, and which apps run from it.
   Clone from your GitHub account or any git URL, pull, fetch, install
   dependencies, or deploy one as an app. Long operations stream output live.
-- **Databases** — What this panel can reach, local or remote. **Create** makes
+- **Databases** — What this panel can reach, local or remote, each showing its
+  endpoint, whether it answers right now, and which apps use it under which
+  variable. **Create** makes
   a new one here: SQLite needs nothing and becomes a file; the server engines
   need one already running, and the dialog says what to install when none is.
   **Connect existing** takes the connection string a managed provider gives you
