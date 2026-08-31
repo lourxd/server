@@ -65,6 +65,7 @@ async function attachDatabase(body) {
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 
 const pm2Serve = () =>
   path.join(path.dirname(createRequire(import.meta.url).resolve('pm2/package.json')), 'lib/API/Serve.js');
@@ -306,16 +307,24 @@ function envFileBody(vars) {
   );
 }
 
+function ensureEnvIgnored(cwd) {
+  if (!fs.existsSync(path.join(cwd, '.git'))) return;
+
+  const check = spawnSync('git', ['-C', cwd, 'check-ignore', '-q', '.env'], { timeout: 5000 });
+  if (check.status === 0) return;
+
+  const ignore = path.join(cwd, '.gitignore');
+  const current = fs.existsSync(ignore) ? fs.readFileSync(ignore, 'utf8') : '';
+  fs.appendFileSync(ignore, `${current && !current.endsWith('\n') ? '\n' : ''}.env\n`);
+  console.log(`[apps] added .env to ${ignore} so the secret cannot be committed`);
+}
+
 function writeEnvFile(cwd, vars) {
   const file = path.join(cwd, '.env');
   fs.writeFileSync(file, envFileBody(vars), { mode: 0o600 });
   fs.chmodSync(file, 0o600);
 
-  const ignore = path.join(cwd, '.gitignore');
-  const current = fs.existsSync(ignore) ? fs.readFileSync(ignore, 'utf8') : '';
-  if (!current.split('\n').some((l) => l.trim() === '.env')) {
-    fs.appendFileSync(ignore, `${current && !current.endsWith('\n') ? '\n' : ''}.env\n`);
-  }
+  ensureEnvIgnored(cwd);
   return file;
 }
 

@@ -351,14 +351,20 @@ export async function gitAction(relPath, action, payload = {}, onLine = () => {}
     case 'install': {
       const pm = detectPackageManager(dir);
       if (!pm) throw new Error('No package.json found in this repository.');
+      const locked = pm === 'npm' && fss.existsSync(path.join(dir, 'package-lock.json'));
+      const installOpts = { ...opts, timeout: 900_000, env: { ...opts.env, NODE_ENV: null } };
+
+      if (locked) {
+        emit({ stream: 'out', line: '$ npm ci --include=dev' });
+        const ci = await runStreaming('npm', ['ci', '--include=dev'], installOpts, emit);
+        if (ci.ok) return ci;
+        emit({ stream: 'err', line: 'npm ci failed — the lockfile is out of step with package.json.' });
+        emit({ stream: 'out', line: 'Falling back to npm install, which will update the lockfile.' });
+      }
+
       const args = pm === 'npm' ? ['install', '--include=dev'] : ['install'];
       emit({ stream: 'out', line: `$ ${pm} ${args.join(' ')}` });
-      return runStreaming(
-        pm,
-        args,
-        { ...opts, timeout: 900_000, env: { ...opts.env, NODE_ENV: null } },
-        emit,
-      );
+      return runStreaming(pm, args, installOpts, emit);
     }
 
     case 'run-script': {
