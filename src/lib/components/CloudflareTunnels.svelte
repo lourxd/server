@@ -10,6 +10,7 @@
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import * as Alert from '$lib/components/ui/alert/index.js';
   import ConfirmDialog from './ConfirmDialog.svelte';
+  import ZoneHint from './ZoneHint.svelte';
 
   import Cloud from '@lucide/svelte/icons/cloud';
   import Plus from '@lucide/svelte/icons/plus';
@@ -50,7 +51,9 @@
   );
 
   const chosenApp = $derived(targets.find((a) => a.service === route.service) ?? null);
-  const routeValid = $derived(!!route.hostname.trim() && !!route.service.trim());
+  const routeValid = $derived(
+    !!route.hostname.trim() && !!route.service.trim() && data.zones.length > 0,
+  );
 
 
   async function act(id, action, body = {}) {
@@ -397,18 +400,7 @@
           spellcheck="false"
           class="font-mono text-xs"
         />
-        {#if data.zones.length}
-          <p class="text-muted-foreground text-[11.5px]">
-            Must sit under {data.zones.map((z) => z.name).join(', ')}.
-          </p>
-        {:else}
-          <p class="text-warn text-[11.5px]">
-            This token cannot see any zone, so no hostname can be routed yet. It needs
-            <span class="font-mono">Zone · Zone · Read</span> and
-            <span class="font-mono">Zone · DNS · Edit</span>, with the domain included in its Zone
-            Resources.
-          </p>
-        {/if}
+        <ZoneHint zones={data.zones} />
       </div>
 
       <div class="space-y-2">

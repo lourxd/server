@@ -24,3 +24,14 @@ test('pct and num do not throw on nothing', () => {
   assert.equal(typeof num(undefined), 'string');
   assert.equal(typeof num(1234), 'string');
 });
+
+test('connectionEndpoint reads as an address, whatever the engine', async () => {
+  const { connectionEndpoint } = await import('../src/lib/format.js');
+  assert.equal(connectionEndpoint({ type: 'sqlite', file: '/x/notes.db' }), '/x/notes.db');
+  assert.equal(connectionEndpoint({ type: 'postgres', host: 'db', port: 5432 }), 'db:5432');
+  assert.equal(
+    connectionEndpoint({ type: 'postgres', host: 'db', port: 5432, database: 'shop' }),
+    'db:5432 / shop',
+  );
+  assert.equal(connectionEndpoint(null), '');
+});

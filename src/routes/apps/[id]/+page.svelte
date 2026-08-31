@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto, invalidateAll } from '$app/navigation';
   import { live, api, apiGet, streamPost, toasts } from '$lib/live.svelte.js';
-  import { bytes, duration, num, relTime } from '$lib/format.js';
+  import { bytes, duration, num, relTime, connectionEndpoint } from '$lib/format.js';
 
   import * as Card from '$lib/components/ui/card/index.js';
   import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -12,6 +12,7 @@
   import { Checkbox } from '$lib/components/ui/checkbox/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { cn } from '$lib/utils.js';
+  import { routesForPort } from '$lib/net.js';
   import { STACK_BY_ID } from '$lib/stacks.js';
   import TechLogo from '$lib/components/TechLogo.svelte';
   import Boxes from '@lucide/svelte/icons/boxes';
@@ -121,13 +122,7 @@
 
   const attachedDb = $derived(data.databases.find((c) => c.id === data.attached.id) ?? null);
 
-  const exposedCount = $derived(
-    data.port
-      ? data.tunnels.flatMap((t) => t.routes).filter((r) =>
-          new RegExp(`(localhost|127\\.0\\.0\\.1):${data.port}\\b`).test(r.service),
-        ).length
-      : 0,
-  );
+  const exposedCount = $derived(routesForPort(data.tunnels, data.port).length);
   const logoFor = (conn) => data.catalogue.find((e) => e.type === conn.type)?.logo ?? 'sqlite';
 
   async function attach(conn) {
@@ -198,7 +193,6 @@
     toasts.ok('Log files cleared', app.name);
   }
 
-  const envEntries = $derived(Object.entries(data.proc.env ?? {}));
 
   const TILES = $derived([
     { label: 'CPU', value: app.status === 'online' ? `${app.cpu}%` : '—', sub: `${app.instances} instance${app.instances === 1 ? '' : 's'}` },
@@ -512,9 +506,7 @@
               {/if}
             </div>
             <p class="text-muted-foreground truncate font-mono text-[10.5px]">
-              {attachedDb.type === 'sqlite'
-                ? attachedDb.file
-                : `${attachedDb.host}:${attachedDb.port}${attachedDb.database ? ` / ${attachedDb.database}` : ''}`}
+              {connectionEndpoint(attachedDb)}
             </p>
           </div>
           <div class="panel rounded-lg px-2.5 py-1.5 font-mono text-[11px]">
@@ -560,7 +552,7 @@
                   {/if}
                 </div>
                 <p class="text-muted-foreground truncate font-mono text-[10.5px]">
-                  {conn.type === 'sqlite' ? conn.file : `${conn.host}:${conn.port}`}
+                  {connectionEndpoint(conn)}
                 </p>
               </div>
               <Button

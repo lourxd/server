@@ -56,3 +56,10 @@ export function cell(v) {
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
 }
+
+export function connectionEndpoint(conn) {
+  if (!conn) return '';
+  if (conn.type === 'sqlite') return conn.file ?? '';
+  const base = `${conn.host}:${conn.port}`;
+  return conn.database ? `${base} / ${conn.database}` : base;
+}

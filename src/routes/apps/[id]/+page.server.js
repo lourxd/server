@@ -43,8 +43,10 @@ export async function load({ params }) {
       ...secretKeys(proc.cwd).map((key) => ({ key, value: '', secret: true, stored: true })),
     ];
 
+    const { env: _env, ...process } = proc;
+
     return {
-      proc,
+      proc: process,
       initialLogs: logs.lines,
       envVars,
       relPath: proc.cwd ? path.relative(path.resolve(settings().projectsDir), proc.cwd) : null,

@@ -2,6 +2,8 @@
   import { invalidateAll } from '$app/navigation';
   import { api, toasts } from '$lib/live.svelte.js';
   import { cn } from '$lib/utils.js';
+  import { serviceUrl, routesForPort } from '$lib/net.js';
+  import ZoneHint from './ZoneHint.svelte';
 
   import { Button } from '$lib/components/ui/button/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
@@ -31,19 +33,13 @@
   let removeTarget = $state(null);
 
   const port = $derived(data.port);
-  const service = $derived(port ? `http://localhost:${port}` : null);
-
+  const service = $derived(serviceUrl(port));
   const named = $derived(data.tunnels.filter((t) => t.kind === 'named'));
+  const routes = $derived(routesForPort(data.tunnels, port));
 
-  const routes = $derived(
-    data.tunnels.flatMap((t) =>
-      t.routes
-        .filter((r) => port && new RegExp(`(localhost|127\\.0\\.0\\.1):${port}\\b`).test(r.service))
-        .map((r) => ({ ...r, tunnel: t })),
-    ),
+  const ready = $derived(
+    data.cloudflare.connected && data.binary.installed && named.length > 0 && data.zones.length > 0,
   );
-
-  const ready = $derived(data.cloudflare.connected && data.binary.installed && named.length > 0);
 
   function openDialog() {
     hostname = '';
@@ -206,17 +202,7 @@
           spellcheck="false"
           class="font-mono text-xs"
         />
-        {#if data.zones.length}
-          <p class="text-muted-foreground text-[11.5px]">
-            Must sit under {data.zones.map((z) => z.name).join(', ')}.
-          </p>
-        {:else}
-          <p class="text-warn text-[11.5px]">
-            This Cloudflare token cannot see any zone, so no hostname can be routed yet. It needs
-            <span class="font-mono">Zone · Zone · Read</span> and
-            <span class="font-mono">Zone · DNS · Edit</span>.
-          </p>
-        {/if}
+        <ZoneHint zones={data.zones} />
       </div>
 
       <div class="space-y-1.5">

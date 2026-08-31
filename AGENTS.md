@@ -78,6 +78,17 @@ build logs and path safety.
 so a server module using it cannot be imported by `node --test`; `appenv.js` and
 `cloudflare/dns.js` both hit this. Components may use `$lib` freely.
 
+**Shared display and matching logic lives in `src/lib`, not in two components.**
+`net.js` matches a tunnel route to an app's port, `format.js` renders a
+connection endpoint, `ZoneHint.svelte` states the zone requirement. Each existed
+twice before, and the port match was a regex built inline in both places — which
+would have matched `:30000` for port `3000` had either been written slightly
+differently.
+
+**A page load should send what the page reads, and no more.** The app detail
+load shipped the process's whole PM2 environment — 28 keys, more than half the
+payload — that nothing on the client used.
+
 **Testable logic does not belong in a route.** `+server.js` files cannot be
 imported outside Vite, so anything in one is unreachable from a test. That is
 why `appenv.js` exists, and why `ports.js` takes the app list as an argument

@@ -36,11 +36,6 @@
   const appsUsing = (id) => live.apps.filter((a) => a.dbId === id);
   const orphans = $derived(live.apps.filter((a) => a.dbId && !known.has(a.dbId)));
 
-  const endpoint = (conn) =>
-    conn.type === 'sqlite'
-      ? conn.file
-      : `${conn.host}:${conn.port}${conn.database ? ` / ${conn.database}` : ''}`;
-
   onMount(() => {
     for (const conn of data.connections) checkHealth(conn);
   });
@@ -201,7 +196,7 @@
                   {conn.remote ? 'remote' : conn.type === 'sqlite' ? 'file' : 'local'}
                 </Badge>
               </div>
-              <p class="text-muted-foreground truncate font-mono text-[11px]">{endpoint(conn)}</p>
+              <p class="text-muted-foreground truncate font-mono text-[11px]">{connectionEndpoint(conn)}</p>
             </div>
 
             <div class="flex shrink-0 items-center gap-4">
