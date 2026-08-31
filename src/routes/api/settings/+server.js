@@ -41,6 +41,17 @@ export async function POST({ request, locals, getClientAddress }) {
         return json({ ok: true, github: status });
       }
 
+      case 'cloudflare-account': {
+        const id = String(body.accountId ?? '').trim();
+        if (id && !/^[0-9a-f]{32}$/i.test(id)) {
+          error(400, 'A Cloudflare account ID is 32 hexadecimal characters.');
+        }
+        await setSetting('cloudflareAccountId', id);
+        invalidate('cf:');
+        audit('settings.cloudflare.account', id || 'cleared');
+        return json({ ok: true, accountId: id });
+      }
+
       case 'cloudflare-token': {
         const token = String(body.token ?? '').trim();
         const { probeCloudflareToken } = await import('$srv/cloudflare/api.js');

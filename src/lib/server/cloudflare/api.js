@@ -78,39 +78,27 @@ export async function probeCloudflareToken(token) {
     const accounts = await cf('/accounts', { token, query: { per_page: 50 } }).catch(() => []);
     const zones = await cf('/zones', { token, query: { per_page: 50, status: 'active' } }).catch(() => []);
 
-    const account = accounts?.[0] ?? null;
-    const zoneCount = Array.isArray(zones) ? zones.length : 0;
-
-    if (!account) {
-      return {
-        connected: false,
-        tokenId: verify?.id ?? null,
-        accountId: null,
-        accountName: null,
-        zoneCount,
-        reason:
-          'The token is valid but can see no Cloudflare account, so it cannot create a tunnel. ' +
-          'It needs Account · Cloudflare Tunnel · Edit, and its Account Resources must include the ' +
-          'account you want to use. A token with only User permissions will verify and do nothing.',
-      };
-    }
+    const fromAccounts = accounts?.[0] ?? null;
+    const fromZone = (zones ?? []).map((z) => z.account).find((a) => a?.id) ?? null;
+    const account = fromAccounts ?? fromZone;
 
     return {
       connected: true,
       tokenId: verify?.id ?? null,
-      accountId: account.id,
-      accountName: account.name,
-      zoneCount,
-      reason:
-        zoneCount === 0
-          ? 'No zones are visible to this token, so a hostname cannot be routed. Add Zone · Zone · Read and Zone · DNS · Edit.'
-          : null,
+      accountId: account?.id ?? null,
+      accountName: account?.name ?? null,
+      zoneCount: Array.isArray(zones) ? zones.length : 0,
+      needsAccountId: !account,
+      reason: account
+        ? Array.isArray(zones) && zones.length === 0
+          ? 'No zones are visible to this token, so a hostname cannot be routed yet. Add Zone · Zone · Read and Zone · DNS · Edit.'
+          : null
+        : 'The token works, but the panel could not work out which account to use — listing accounts needs Account · Account Settings · Read, which Cloudflare Tunnel · Edit does not include. Paste your Account ID below and everything else will work.',
     };
   } catch (err) {
     return { connected: false, reason: err.message };
   }
-}
-export function cloudflareStatus() {
+}export function cloudflareStatus() {
   const token = settings().cloudflareToken;
   if (!token) return Promise.resolve({ connected: false, reason: 'No Cloudflare API token configured.' });
   return cached('cf:status', 60_000, () => probeCloudflareToken(token));

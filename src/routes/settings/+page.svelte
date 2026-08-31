@@ -132,6 +132,20 @@
     },
   ]);
 
+  let cfAccountId = $state(data.config?.cloudflareAccountId ?? '');
+  let savingCfAccount = $state(false);
+
+  async function saveCloudflareAccount() {
+    savingCfAccount = true;
+    try {
+      await api('/api/settings', { action: 'cloudflare-account', accountId: cfAccountId.trim() });
+      toasts.ok('Account saved');
+      await invalidateAll();
+    } finally {
+      savingCfAccount = false;
+    }
+  }
+
   let installingCf = $state(false);
   let cfInstallLines = $state([]);
 
@@ -591,14 +605,44 @@
             </div>
 
             {#if data.cloudflare.connected}
-              <p class="text-muted-foreground font-mono text-[11px] break-all">
-                {data.cloudflare.accountId ?? ''}
-              </p>
+              {#if data.cloudflare.accountId}
+                <p class="text-muted-foreground font-mono text-[11px] break-all">
+                  {data.cloudflare.accountId}
+                </p>
+              {/if}
+
               {#if data.cloudflare.reason}
                 <Alert.Root>
                   <CircleAlert class="size-4" />
                   <Alert.Description class="text-xs">{data.cloudflare.reason}</Alert.Description>
                 </Alert.Root>
+              {/if}
+
+              {#if !data.cloudflare.accountId}
+                <div class="space-y-1.5">
+                  <Label for="cf-account">Account ID</Label>
+                  <div class="flex gap-2">
+                    <Input
+                      id="cf-account"
+                      bind:value={cfAccountId}
+                      placeholder="32 hexadecimal characters"
+                      spellcheck="false"
+                      class="font-mono text-xs"
+                    />
+                    <Button
+                      class="accent-fill shrink-0 rounded-xl px-4 font-semibold"
+                      disabled={savingCfAccount || !cfAccountId.trim()}
+                      onclick={saveCloudflareAccount}
+                    >
+                      {savingCfAccount ? 'Saving…' : 'Save'}
+                    </Button>
+                  </div>
+                  <p class="text-muted-foreground text-[11.5px]">
+                    Cloudflare dashboard → your account → the ID under
+                    <span class="font-mono">Account Home</span>, or the hex string in the dashboard
+                    URL after <span class="font-mono">/</span>.
+                  </p>
+                </div>
               {/if}
             {:else}
               <p class="text-muted-foreground text-[11.5px]">
