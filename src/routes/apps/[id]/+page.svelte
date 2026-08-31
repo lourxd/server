@@ -32,6 +32,11 @@
   import Database from '@lucide/svelte/icons/database';
   import Link2Off from '@lucide/svelte/icons/link-2-off';
   import Hammer from '@lucide/svelte/icons/hammer';
+  import Globe from '@lucide/svelte/icons/globe';
+  import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
+  import KeyRound from '@lucide/svelte/icons/key-round';
+  import ScrollText from '@lucide/svelte/icons/scroll-text';
+  import AppNetwork from '$lib/components/AppNetwork.svelte';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 
   let { data } = $props();
@@ -115,6 +120,14 @@
   let detachConfirm = $state(false);
 
   const attachedDb = $derived(data.databases.find((c) => c.id === data.attached.id) ?? null);
+
+  const exposedCount = $derived(
+    data.port
+      ? data.tunnels.flatMap((t) => t.routes).filter((r) =>
+          new RegExp(`(localhost|127\\.0\\.0\\.1):${data.port}\\b`).test(r.service),
+        ).length
+      : 0,
+  );
   const logoFor = (conn) => data.catalogue.find((e) => e.type === conn.type)?.logo ?? 'sqlite';
 
   async function attach(conn) {
@@ -292,13 +305,26 @@
 <div class="flex flex-1 flex-col gap-3.5 p-5 pt-3.5 md:p-6 md:pt-3.5">
   <Tabs.Root value="overview">
     <Tabs.List>
-      <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+      <Tabs.Trigger value="overview" class="gap-1.5">
+        <LayoutDashboard class="size-3.5" /> Overview
+      </Tabs.Trigger>
       <Tabs.Trigger value="env" class="gap-1.5">
-        Environment
+        <KeyRound class="size-3.5" /> Environment
         {#if envDirty}<span class="dot text-primary"></span>{/if}
       </Tabs.Trigger>
-      <Tabs.Trigger value="database">Database</Tabs.Trigger>
-      <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
+      <Tabs.Trigger value="database" class="gap-1.5">
+        <Database class="size-3.5" /> Database
+        {#if attachedDb}<span class="dot text-ok"></span>{/if}
+      </Tabs.Trigger>
+      <Tabs.Trigger value="network" class="gap-1.5">
+        <Globe class="size-3.5" /> Network
+        {#if exposedCount}
+          <span class="tabular font-mono text-[10px]">{exposedCount}</span>
+        {/if}
+      </Tabs.Trigger>
+      <Tabs.Trigger value="logs" class="gap-1.5">
+        <ScrollText class="size-3.5" /> Logs
+      </Tabs.Trigger>
     </Tabs.List>
 
     <Tabs.Content value="overview" class="space-y-3">
@@ -466,6 +492,10 @@
           </Button>
         </div>
       </div>
+    </Tabs.Content>
+
+    <Tabs.Content value="network">
+      <AppNetwork {data} {app} />
     </Tabs.Content>
 
     <Tabs.Content value="database" class="space-y-3">
