@@ -59,6 +59,13 @@
     vars = next;
   }
 
+  function onValueInput(i, value) {
+    const next = [...vars];
+    next[i] = { ...next[i], value };
+    if (value) next[i].stored = false;
+    vars = next;
+  }
+
   function toggleReveal(i) {
     const next = new Set(revealed);
     next.has(i) ? next.delete(i) : next.add(i);
@@ -153,11 +160,12 @@
             class={cn('h-8.5 font-mono text-[11.5px]', (dup || bad) && 'border-bad/60 text-bad')}
           />
           <Input
-            bind:value={v.value}
-            type={v.secret && !revealed.has(i) ? 'password' : 'text'}
-            placeholder="value"
+            value={v.value}
+            oninput={(e) => onValueInput(i, e.currentTarget.value)}
+            type={v.secret && !v.stored && !revealed.has(i) ? 'password' : 'text'}
+            placeholder={v.stored ? '•••••••• stored, unchanged' : 'value'}
             spellcheck="false"
-            class="h-8.5 font-mono text-[11.5px]"
+            class={cn('h-8.5 font-mono text-[11.5px]', v.stored && 'placeholder:text-primary/70')}
           />
           <div class="flex items-center gap-0.5">
             <Button
@@ -173,8 +181,8 @@
               variant="ghost"
               size="icon"
               class="size-8 rounded-lg"
-              disabled={!v.secret}
-              title="Reveal"
+              disabled={!v.secret || v.stored}
+              title={v.stored ? 'Stored on disk — type to replace it' : 'Reveal'}
               onclick={() => toggleReveal(i)}
             >
               {#if revealed.has(i)}<EyeOff class="size-3.5" />{:else}<Eye class="size-3.5" />{/if}
@@ -214,6 +222,8 @@
   <p class="text-muted-foreground text-[11.5px]">
     Values marked with the key icon are written to a <code class="font-mono">.env</code> file in the
     project (mode 0600) and never handed to PM2 — <code class="font-mono">pm2 save</code> writes its
-    environment to a world-readable file. Everything else is passed to PM2 directly.
+    environment to a world-readable file. Everything else is passed to PM2 directly. A secret shown
+    as <span class="text-primary/70">stored, unchanged</span> is already on disk and is never sent
+    to this page; type to replace it, or leave it alone.
   </p>
 </div>

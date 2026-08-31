@@ -185,13 +185,15 @@ async function startProcess(body) {
     return pm2.startFromFile(file);
   }
 
-  const split = splitEnv(body.envVars);
+  const split = splitEnv(body.envVars, readEnvFile(cwd));
   const env = Array.isArray(body.envVars) ? split.plain : (parseEnv(body.env) ?? {});
   const secrets = split.secret;
-  if (Object.keys(secrets).length) writeEnvFile(cwd, secrets);
+  if (Array.isArray(body.envVars) && (Object.keys(secrets).length || fs.existsSync(path.join(cwd, '.env')))) {
+    writeEnvFile(cwd, secrets);
+  }
   if (body.stack && /^[a-z0-9-]{1,32}$/.test(body.stack)) env.SCP_STACK = body.stack;
   env[pm2.ENV_KEYS_VAR] = Object.keys(env)
-    .filter((k) => k !== pm2.ENV_KEYS_VAR && k !== 'SCP_STACK')
+    .filter((k) => !/^SCP_/.test(k))
     .join(',');
 
   const name = String(body.name || path.basename(cwd)).trim();
@@ -278,7 +280,7 @@ function parseArgs(input) {
 
 const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-function splitEnv(input) {
+function splitEnv(input, existingSecrets = {}) {
   const plain = {};
   const secret = {};
   if (!Array.isArray(input)) return { plain, secret };
@@ -286,7 +288,12 @@ function splitEnv(input) {
     const key = String(row?.key ?? '').trim();
     if (!key) continue;
     if (!ENV_KEY_RE.test(key)) error(400, `Invalid environment variable name: ${key}`);
-    (row.secret ? secret : plain)[key] = String(row.value ?? '');
+    if (!row.secret) {
+      plain[key] = String(row.value ?? '');
+      continue;
+    }
+    const typed = String(row.value ?? '');
+    secret[key] = typed === '' && key in existingSecrets ? existingSecrets[key] : typed;
   }
   return { plain, secret };
 }

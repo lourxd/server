@@ -178,7 +178,7 @@ export function appEnv(env) {
       declared
         .split(',')
         .map((k) => k.trim())
-        .filter((k) => k && k in all)
+        .filter((k) => k && k in all && !PANEL_ENV.test(k))
         .map((k) => [k, all[k]]),
     );
   }
