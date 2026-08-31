@@ -5,7 +5,11 @@ import { DATA_DIR } from './store/index.js';
 const DIR = path.join(DATA_DIR, 'build-logs');
 const MAX_BYTES = 512 * 1024;
 
-const safeName = (name) => String(name ?? '').replace(/[^A-Za-z0-9._@-]/g, '_').slice(0, 96);
+const safeName = (name) =>
+  String(name ?? '')
+    .replace(/[^A-Za-z0-9._@-]/g, '_')
+    .replace(/^[.]+/, '')
+    .slice(0, 96);
 
 function fileFor(name) {
   const clean = safeName(name);

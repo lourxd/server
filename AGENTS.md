@@ -68,8 +68,20 @@ npm run db:studio
 npm run db:check
 ```
 
-There is **no test suite and no linter configured**. Verification is: build
-cleanly, then exercise the affected routes against the running service. A build
+`npm test` runs the suite (`node --test`, no dependencies — it must stay that
+way). It covers the logic worth trusting: environment splitting and `.env`
+round-tripping, status mapping, port probing, connection-string parsing and
+building, PM2 env sanitising and filtering, stack integrity, activity tracking,
+build logs and path safety.
+
+**Testable logic does not belong in a route.** `+server.js` files cannot be
+imported outside Vite, so anything in one is unreachable from a test. That is
+why `appenv.js` exists, and why `ports.js` takes the app list as an argument
+instead of importing `pm2.js` — reaching for the PM2 client opened a daemon
+connection that never closed, and hung the test run.
+
+Beyond `npm test`, verification is: build cleanly, then exercise the affected
+routes against the running service. A build
 that emits Rollup warnings about missing exports is a failure, not a warning —
 that class of warning has shipped a runtime crash here before (§8).
 

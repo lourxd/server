@@ -66,6 +66,7 @@ export const STACKS = [
     detect: ['@nestjs/core'],
     clusterable: true,
     defaults: {
+      buildMarker: 'dist/main.js',
       buildOutput: 'dist',
       build: 'npm run build',
       script: 'dist/main.js',
@@ -185,9 +186,11 @@ export const STACKS = [
 
 export const STACK_BY_ID = Object.fromEntries(STACKS.map((s) => [s.id, s]));
 
+const names = (value) => (Array.isArray(value) ? value : Object.keys(value ?? {}));
+
 export function detectStack(pkg) {
   if (!pkg) return null;
-  const deps = new Set([...(pkg.dependencies ?? []), ...(pkg.devDependencies ?? []), ...(pkg.allDeps ?? [])]);
+  const deps = new Set([...names(pkg.dependencies), ...names(pkg.devDependencies), ...names(pkg.allDeps)]);
   for (const stack of STACKS) {
     if (stack.detect.some((d) => deps.has(d))) return stack.id;
   }

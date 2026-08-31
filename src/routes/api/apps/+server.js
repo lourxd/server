@@ -5,30 +5,16 @@ import { STACK_BY_ID } from '$lib/stacks.js';
 import { checkPort } from '$srv/ports.js';
 import { getConnection } from '$srv/store/connections.js';
 import { connectionUrl, defaultVarFor } from '$srv/db/provision.js';
+import {
+  MARKERS,
+  declaredKeys,
+  readEnvFile,
+  splitEnv,
+  writeEnvFile,
+} from '$srv/appenv.js';
 
-const DB_MARKER = 'SCP_DB';
-const PENDING_BUILD = 'SCP_PENDING_BUILD';
-const WANTED_AUTORESTART = 'SCP_AUTORESTART';
+const { db: DB_MARKER, dbVar: DB_VAR_MARKER, pendingBuild: PENDING_BUILD, autorestart: WANTED_AUTORESTART } = MARKERS;
 
-function readEnvFile(cwd) {
-  const out = {};
-  try {
-    for (const raw of fs.readFileSync(path.join(cwd, '.env'), 'utf8').split('\n')) {
-      const line = raw.trim();
-      if (!line || line.startsWith('#')) continue;
-      const eq = line.indexOf('=');
-      if (eq < 1) continue;
-      const key = line.slice(0, eq).replace(/^export\s+/, '').trim();
-      let value = line.slice(eq + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      if (key) out[key] = value;
-    }
-  } catch {
-  }
-  return out;
-}
 
 async function attachDatabase(body) {
   const target = body.id ?? body.name;
@@ -42,7 +28,7 @@ async function attachDatabase(body) {
   let varName = String(body.varName ?? '').trim();
 
   if (body.detach) {
-    varName = varName || proc.env?.[`${DB_MARKER}_VAR`] || '';
+    varName = varName || proc.env?.[DB_VAR_MARKER] || '';
     if (varName) delete secrets[varName];
     marker = null;
   } else {
@@ -59,7 +45,7 @@ async function attachDatabase(body) {
   ];
   if (marker) {
     envVars.push({ key: DB_MARKER, value: marker, secret: false });
-    envVars.push({ key: `${DB_MARKER}_VAR`, value: varName, secret: false });
+    envVars.push({ key: DB_VAR_MARKER, value: varName, secret: false });
   }
 
   return updateEnv({ id: proc.pmId, envVars });
@@ -67,7 +53,6 @@ async function attachDatabase(body) {
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
 
 const pm2Serve = () =>
   path.join(path.dirname(createRequire(import.meta.url).resolve('pm2/package.json')), 'lib/API/Serve.js');
@@ -145,7 +130,8 @@ export async function POST({ request }) {
 
 async function assertPortFree(port, { force = false } = {}) {
   if (force || port == null || port === '') return;
-  const result = await checkPort(port);
+  const apps = await pm2.list().catch(() => []);
+  const result = await checkPort(port, { apps });
   if (result.free || !result.valid) return;
   error(409, `${result.reason} Choose another port, or stop what is holding it.`);
 }
@@ -224,9 +210,7 @@ async function startProcess(body) {
     env[PENDING_BUILD] = '1';
     env[WANTED_AUTORESTART] = body.autorestart === false ? '0' : '1';
   }
-  env[pm2.ENV_KEYS_VAR] = Object.keys(env)
-    .filter((k) => !/^SCP_/.test(k))
-    .join(',');
+  env[pm2.ENV_KEYS_VAR] = declaredKeys(env);
 
   const name = String(body.name || path.basename(cwd)).trim();
   if (!/^[A-Za-z0-9._@/-]+$/.test(name)) error(400, 'Invalid app name.');
@@ -317,54 +301,9 @@ function parseArgs(input) {
   return String(input).match(/"[^"]*"|'[^']*'|\S+/g)?.map((s) => s.replace(/^["']|["']$/g, '')) ?? [];
 }
 
-const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-function splitEnv(input, existingSecrets = {}) {
-  const plain = {};
-  const secret = {};
-  if (!Array.isArray(input)) return { plain, secret };
-  for (const row of input) {
-    const key = String(row?.key ?? '').trim();
-    if (!key) continue;
-    if (!ENV_KEY_RE.test(key)) error(400, `Invalid environment variable name: ${key}`);
-    if (!row.secret) {
-      plain[key] = String(row.value ?? '');
-      continue;
-    }
-    const typed = String(row.value ?? '');
-    secret[key] = typed === '' && key in existingSecrets ? existingSecrets[key] : typed;
-  }
-  return { plain, secret };
-}
 
-function envFileBody(vars) {
-  return (
-    Object.entries(vars)
-      .map(([k, v]) => (/[\s"'#$`\\]/.test(v) ? `${k}="${v.replace(/(["\\$`])/g, '\\$1')}"` : `${k}=${v}`))
-      .join('\n') + '\n'
-  );
-}
 
-function ensureEnvIgnored(cwd) {
-  if (!fs.existsSync(path.join(cwd, '.git'))) return;
-
-  const check = spawnSync('git', ['-C', cwd, 'check-ignore', '-q', '.env'], { timeout: 5000 });
-  if (check.status === 0) return;
-
-  const ignore = path.join(cwd, '.gitignore');
-  const current = fs.existsSync(ignore) ? fs.readFileSync(ignore, 'utf8') : '';
-  fs.appendFileSync(ignore, `${current && !current.endsWith('\n') ? '\n' : ''}.env\n`);
-  console.log(`[apps] added .env to ${ignore} so the secret cannot be committed`);
-}
-
-function writeEnvFile(cwd, vars) {
-  const file = path.join(cwd, '.env');
-  fs.writeFileSync(file, envFileBody(vars), { mode: 0o600 });
-  fs.chmodSync(file, 0o600);
-
-  ensureEnvIgnored(cwd);
-  return file;
-}
 
 function parseEnv(input) {
   if (!input) return undefined;

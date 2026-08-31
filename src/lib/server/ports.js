@@ -1,6 +1,5 @@
 import net from 'node:net';
 import si from 'systeminformation';
-import * as pm2 from './pm2.js';
 
 const HOSTS = ['0.0.0.0', '127.0.0.1'];
 
@@ -17,21 +16,21 @@ function tryBind(port, host) {
   });
 }
 
-async function holder(port) {
+async function holder(port, apps) {
   const conns = await si.networkConnections().catch(() => []);
   const match = (conns || []).find((c) => c.state === 'LISTEN' && Number(c.localPort) === port);
   if (!match) return null;
 
-  let app = null;
-  if (match.pid) {
-    const list = await pm2.list().catch(() => []);
-    const found = list.find((a) => a.pid === match.pid);
-    if (found) app = { name: found.name, pmId: found.pmId, status: found.status };
-  }
-  return { pid: match.pid || null, process: match.process || '', address: match.localAddress, app };
+  const found = match.pid ? apps.find((a) => a.pid === match.pid) : null;
+  return {
+    pid: match.pid || null,
+    process: match.process || '',
+    address: match.localAddress,
+    app: found ? { name: found.name, pmId: found.pmId, status: found.status } : null,
+  };
 }
 
-export async function checkPort(port) {
+export async function checkPort(port, { apps = [] } = {}) {
   const n = Number(port);
   if (!Number.isInteger(n) || n < 1 || n > 65535) {
     return { port, valid: false, free: false, reason: 'Not a valid port number.' };
@@ -56,7 +55,7 @@ export async function checkPort(port) {
   }
   if (!blocked) return { port: n, valid: true, free: true };
 
-  const held = await holder(n);
+  const held = await holder(n, apps);
   return {
     port: n,
     valid: true,
