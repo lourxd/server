@@ -46,8 +46,8 @@
   import RefreshCcw from '@lucide/svelte/icons/refresh-ccw';
   import Download from '@lucide/svelte/icons/download';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-  import Check from '@lucide/svelte/icons/check';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import Globe from '@lucide/svelte/icons/globe';
 
   let { data } = $props();
 
@@ -105,6 +105,31 @@
     ['npm', data.host?.npm],
     ['git', data.host?.git ?? '—'],
     ['docker', data.host?.docker || 'not installed'],
+  ]);
+
+  const cfNamed = $derived(data.tunnels.filter((t) => t.kind === 'named').length);
+  const cfReady = $derived(data.cloudflare.connected && data.binary.installed);
+
+  const cfHops = $derived([
+    { label: 'This machine', sub: 'panel running', icon: Server, lit: true },
+    {
+      label: 'cloudflared',
+      sub: data.binary.installed ? 'installed' : 'not installed',
+      icon: Lock,
+      lit: data.binary.installed,
+    },
+    {
+      label: 'Cloudflare',
+      sub: data.cloudflare.connected ? (data.cloudflare.accountName ?? 'connected') : 'no token',
+      icon: Cloud,
+      lit: data.cloudflare.connected,
+    },
+    {
+      label: 'Your domain',
+      sub: cfNamed ? `${cfNamed} tunnel${cfNamed === 1 ? '' : 's'}` : 'no tunnel',
+      icon: Globe,
+      lit: cfNamed > 0,
+    },
   ]);
 
   let installingCf = $state(false);
@@ -492,183 +517,173 @@
       </Card.Root>
     </Tabs.Content>
 
-    <Tabs.Content value="cloudflare" class="max-w-3xl space-y-3">
-      <div class="panel-raised rounded-2xl p-5">
-        <div class="flex items-start gap-3.5">
-          <div class="accent-wash grid size-10 shrink-0 place-items-center rounded-xl">
-            <Cloud class="size-5" />
-          </div>
+    <Tabs.Content value="cloudflare" class="max-w-3xl">
+      <div class="panel-raised space-y-4.5 rounded-2xl p-5">
+        <div class="flex items-start gap-3">
           <div class="min-w-0 flex-1">
-            <p class="text-[15px] font-semibold">Publish an app without opening a port</p>
-            <p class="text-muted-foreground mt-1 text-[12.5px] leading-relaxed">
-              A tunnel makes an outbound connection from this machine to Cloudflare, and traffic for
-              your hostname comes back down it. Nothing listens on the public internet here, and your
-              firewall stays shut.
+            <p class="text-[15px] font-semibold">Cloudflare Tunnel</p>
+            <p class="text-muted-foreground mt-1 max-w-[56ch] text-[12.5px] leading-relaxed">
+              Your machine dials out to Cloudflare and holds the line open. Requests for your hostname
+              come back down it, so nothing here has to listen on the public internet.
             </p>
           </div>
-        </div>
-      </div>
-
-      <div class="panel-raised rounded-2xl p-5">
-        <div class="flex flex-wrap items-center gap-3">
           <span
             class={cn(
-              'grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold',
-              data.cloudflare.connected ? 'bg-ok text-background' : 'accent-fill',
+              'tabular flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10.5px]',
+              cfReady ? 'bg-ok/14 text-ok' : 'bg-warn/14 text-warn',
             )}
           >
-            {#if data.cloudflare.connected}<Check class="size-3.5" />{:else}1{/if}
+            <span class="dot"></span>{cfReady ? 'ready' : 'not set up'}
           </span>
-          <div class="min-w-0 flex-1">
-            <p class="text-[14px] font-semibold">API token</p>
-            <p class="text-muted-foreground mt-0.5 text-[11.5px]">
-              Lets the panel create the tunnel and write the DNS record that points at it.
-            </p>
-          </div>
-          {#if data.cloudflare.connected}
-            <Badge variant="outline" class="border-ok/40 text-ok gap-1.5">
-              <span class="dot"></span>{data.cloudflare.accountName ?? 'connected'}
-            </Badge>
-          {/if}
         </div>
 
-        <div class="mt-4 space-y-3.5">
-          {#if data.cloudflare.connected}
-            <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-[minmax(7rem,auto)_1fr]">
-              <dt class="text-muted-foreground text-[12.5px]">Account</dt>
-              <dd class="font-mono text-[11.5px]">{data.cloudflare.accountName ?? '—'}</dd>
-              <dt class="text-muted-foreground text-[12.5px]">Account ID</dt>
-              <dd class="font-mono text-[11.5px] break-all">{data.cloudflare.accountId ?? '—'}</dd>
-            </dl>
-            <Button variant="ghost" size="sm" class="panel h-8 rounded-lg" onclick={disconnectCloudflare}>
-              <Link2Off class="size-3.5" /> Disconnect
-            </Button>
-          {:else}
-            {#if data.cloudflare.reason && data.cloudflare.reason !== 'No Cloudflare API token configured.'}
-              <Alert.Root variant="destructive">
-                <CircleAlert class="size-4" />
-                <Alert.Description>{data.cloudflare.reason}</Alert.Description>
-              </Alert.Root>
+        <div class="flex items-start py-1">
+          {#each cfHops as hop, i (hop.label)}
+            {@const Icon = hop.icon}
+            {#if i > 0}
+              <div class="grid h-11.5 flex-none basis-8 place-items-center">
+                <div
+                  class={cn(
+                    'h-0.5 w-full rounded-sm',
+                    hop.lit && cfHops[i - 1].lit ? 'bg-ok' : 'bg-foreground/12',
+                  )}
+                ></div>
+              </div>
             {/if}
+            <div class="flex min-w-0 flex-1 flex-col items-center gap-2">
+              <div
+                class={cn(
+                  'grid size-11.5 place-items-center rounded-2xl',
+                  hop.lit ? 'panel text-foreground' : 'text-foreground/35 ring-foreground/6 ring-1',
+                )}
+              >
+                <Icon class="size-5" />
+              </div>
+              <div class="min-w-0 text-center">
+                <p class={cn('text-[12px] font-medium', hop.lit ? '' : 'text-foreground/35')}>
+                  {hop.label}
+                </p>
+                <p class="text-muted-foreground truncate font-mono text-[9.5px]">{hop.sub}</p>
+              </div>
+            </div>
+          {/each}
+        </div>
 
-            <div class="panel space-y-2 rounded-xl p-3.5">
-              <p class="text-[12.5px]">
-                Create it at
+        <div class="bg-border h-px"></div>
+
+        <div class="space-y-3.5">
+          <div class="space-y-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="text-[13px] font-medium">API token</p>
+              {#if data.cloudflare.connected}
+                <Badge variant="outline" class="border-ok/40 text-ok gap-1.5">
+                  <span class="dot"></span>{data.cloudflare.accountName ?? 'connected'}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="ml-auto h-7 rounded-lg"
+                  onclick={disconnectCloudflare}
+                >
+                  <Link2Off class="size-3.5" /> Disconnect
+                </Button>
+              {/if}
+            </div>
+
+            {#if data.cloudflare.connected}
+              <p class="text-muted-foreground font-mono text-[11px] break-all">
+                {data.cloudflare.accountId ?? ''}
+              </p>
+            {:else}
+              <p class="text-muted-foreground text-[11.5px]">
+                Needs <span class="font-mono">Tunnel·Edit</span>,
+                <span class="font-mono">DNS·Edit</span> and <span class="font-mono">Zone·Read</span>.
                 <a
                   href="https://dash.cloudflare.com/profile/api-tokens"
                   target="_blank"
                   rel="noreferrer"
                   class="text-primary inline-flex items-center gap-1 hover:underline"
                 >
-                  Cloudflare → My Profile → API Tokens
-                  <ExternalLink class="size-3" />
+                  Create one<ExternalLink class="size-3" />
                 </a>
-                with three permissions:
               </p>
-              <div class="grid gap-1.5 font-mono text-[11px] sm:grid-cols-3">
-                <span class="panel rounded-lg px-2 py-1.5">Account · Cloudflare Tunnel · Edit</span>
-                <span class="panel rounded-lg px-2 py-1.5">Zone · DNS · Edit</span>
-                <span class="panel rounded-lg px-2 py-1.5">Zone · Zone · Read</span>
+
+              {#if data.cloudflare.reason && data.cloudflare.reason !== 'No Cloudflare API token configured.'}
+                <Alert.Root variant="destructive">
+                  <CircleAlert class="size-4" />
+                  <Alert.Description>{data.cloudflare.reason}</Alert.Description>
+                </Alert.Root>
+              {/if}
+
+              <div class="flex gap-2">
+                <Input
+                  type="password"
+                  bind:value={cfToken}
+                  placeholder="Paste the token"
+                  autocomplete="off"
+                  class="font-mono text-xs"
+                />
+                <Button
+                  class="accent-fill shrink-0 rounded-xl px-4 font-semibold"
+                  disabled={savingCf || !cfToken.trim()}
+                  onclick={saveCloudflare}
+                >
+                  <Plug class="size-4" />
+                  {savingCf ? 'Verifying…' : 'Connect'}
+                </Button>
               </div>
-              <p class="text-muted-foreground text-[11.5px]">
-                Tunnel creates it, DNS points a hostname at it, Zone finds your domains. Stored
-                encrypted, and never sent back to this page.
+            {/if}
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-[13px] font-medium">cloudflared</p>
+              <p class="text-muted-foreground mt-0.5 text-[11.5px]">
+                {#if data.binary.installed}
+                  <span class="font-mono">{data.binary.version}</span> ·
+                  <span class="font-mono">{data.binary.path}</span>
+                {:else}
+                  Static binary into <span class="font-mono">~/.local/bin</span>. No sudo, nothing
+                  system-wide.
+                {/if}
               </p>
             </div>
-
-            <div class="flex gap-2">
-              <Input
-                type="password"
-                bind:value={cfToken}
-                placeholder="Paste the token"
-                autocomplete="off"
-                class="font-mono text-xs"
-              />
+            {#if !data.binary.installed}
               <Button
-                class="accent-fill shrink-0 rounded-xl px-4 font-semibold"
-                disabled={savingCf || !cfToken.trim()}
-                onclick={saveCloudflare}
+                variant="ghost"
+                size="sm"
+                class="panel h-8.5 shrink-0 rounded-xl px-4"
+                disabled={installingCf}
+                onclick={installCloudflared}
               >
-                <Plug class="size-4" />
-                {savingCf ? 'Verifying…' : 'Connect'}
+                {#if installingCf}
+                  <LoaderCircle class="size-3.5 animate-spin" />
+                {:else}
+                  <Download class="size-3.5" />
+                {/if}
+                {installingCf ? 'Installing…' : 'Install'}
+              </Button>
+            {/if}
+          </div>
+
+          {#if cfInstallLines.length && !data.binary.installed}
+            <LogStream lines={cfInstallLines} height="200px" />
+          {/if}
+
+          {#if cfReady}
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="min-w-0 flex-1">
+                <p class="text-[13px] font-medium">Tunnels</p>
+                <p class="text-muted-foreground mt-0.5 text-[11.5px]">
+                  {cfNamed} named tunnel{cfNamed === 1 ? '' : 's'} · route a hostname from an app's
+                  Network tab.
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" class="panel h-8.5 shrink-0 rounded-xl px-4" href="/network">
+                Open Network <ArrowRight class="size-3.5" />
               </Button>
             </div>
           {/if}
-        </div>
-      </div>
-
-      <div class="panel-raised rounded-2xl p-5">
-        <div class="flex flex-wrap items-center gap-3">
-          <span
-            class={cn(
-              'grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold',
-              data.binary.installed ? 'bg-ok text-background' : 'accent-fill',
-            )}
-          >
-            {#if data.binary.installed}<Check class="size-3.5" />{:else}2{/if}
-          </span>
-          <div class="min-w-0 flex-1">
-            <p class="text-[14px] font-semibold">cloudflared on this machine</p>
-            <p class="text-muted-foreground mt-0.5 text-[11.5px]">
-              The connector that holds the link open. Downloads into
-              <code class="font-mono">~/.local/bin</code> — no sudo, nothing system-wide.
-            </p>
-          </div>
-          {#if data.binary.installed}
-            <Badge variant="outline" class="border-ok/40 text-ok gap-1.5">
-              <span class="dot"></span>installed
-            </Badge>
-          {:else}
-            <Button
-              size="sm"
-              class="accent-fill h-8.5 shrink-0 rounded-xl px-4 font-semibold"
-              disabled={installingCf}
-              onclick={installCloudflared}
-            >
-              {#if installingCf}
-                <LoaderCircle class="size-3.5 animate-spin" />
-              {:else}
-                <Download class="size-3.5" />
-              {/if}
-              {installingCf ? 'Installing…' : 'Install'}
-            </Button>
-          {/if}
-        </div>
-
-        {#if data.binary.installed}
-          <dl class="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-[minmax(7rem,auto)_1fr]">
-            <dt class="text-muted-foreground text-[12.5px]">Version</dt>
-            <dd class="font-mono text-[11.5px] break-all">{data.binary.version}</dd>
-            <dt class="text-muted-foreground text-[12.5px]">Path</dt>
-            <dd class="font-mono text-[11.5px] break-all">{data.binary.path}</dd>
-          </dl>
-        {:else if cfInstallLines.length}
-          <div class="mt-4">
-            <LogStream lines={cfInstallLines} height="220px" />
-          </div>
-        {/if}
-      </div>
-
-      <div class="panel rounded-2xl p-5">
-        <div class="flex flex-wrap items-center gap-3">
-          <span class="bg-foreground/8 text-muted-foreground grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold">
-            3
-          </span>
-          <div class="min-w-0 flex-1">
-            <p class="text-[14px] font-semibold">Create a tunnel and route a hostname</p>
-            <p class="text-muted-foreground mt-0.5 text-[11.5px]">
-              One tunnel carries every hostname on this machine. Route one from an app's Network tab.
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="panel h-8.5 shrink-0 rounded-xl px-4"
-            href="/network"
-            disabled={!data.cloudflare.connected || !data.binary.installed}
-          >
-            Open Network <ArrowRight class="size-3.5" />
-          </Button>
         </div>
       </div>
     </Tabs.Content>
