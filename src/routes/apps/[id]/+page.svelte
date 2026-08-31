@@ -46,6 +46,24 @@
 
   const envDirty = $derived(JSON.stringify(envVars) !== JSON.stringify(data.envVars));
 
+  let logKind = $state('runtime');
+  let buildLog = $state(null);
+  let buildLoading = $state(false);
+
+  async function loadBuildLog() {
+    buildLoading = true;
+    try {
+      buildLog = await apiGet(`/api/logs/${data.proc.pmId}`, { kind: 'build', name: app.name });
+    } finally {
+      buildLoading = false;
+    }
+  }
+
+  function switchLogs(kind) {
+    logKind = kind;
+    if (kind === 'build' && !buildLog) loadBuildLog();
+  }
+
   let dbBusy = $state(false);
   let detachConfirm = $state(false);
 
@@ -262,7 +280,28 @@
     <Tabs.Content value="logs">
       <Card.Root class="gap-0 py-0">
         <Card.Header class="border-border flex-row flex-wrap items-center gap-3 border-b py-3.5">
-          <Card.Title class="text-base">Output</Card.Title>
+          <div class="panel flex items-center gap-0.5 rounded-lg p-0.5">
+            <button
+              type="button"
+              onclick={() => switchLogs('runtime')}
+              class={cn(
+                'rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors',
+                logKind === 'runtime' ? 'bg-background text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              Runtime
+            </button>
+            <button
+              type="button"
+              onclick={() => switchLogs('build')}
+              class={cn(
+                'rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors',
+                logKind === 'build' ? 'bg-background text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              Build
+            </button>
+          </div>
           <Badge
             variant="outline"
             class={live.connected ? 'border-ok/40 text-ok gap-1.5' : 'border-bad/40 text-bad gap-1.5'}
@@ -290,11 +329,29 @@
           </div>
         </Card.Header>
         <Card.Content class="p-3">
-          <LogStream lines={logs} bind:filter bind:autoscroll height="52vh" />
-          <div class="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px]">
-            <span>{logs.length} lines buffered · new output appears live</span>
-            <span class="ml-auto font-mono">{app.outLog ?? ''}</span>
-          </div>
+          {#if logKind === 'runtime'}
+            <LogStream lines={logs} bind:filter bind:autoscroll height="52vh" />
+            <div class="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px]">
+              <span>{logs.length} lines buffered · new output appears live</span>
+              <span class="ml-auto font-mono">{app.outLog ?? ''}</span>
+            </div>
+          {:else if buildLoading}
+            <p class="text-muted-foreground flex items-center gap-2 py-10 text-center text-sm">
+              <LoaderCircle class="size-4 animate-spin" /> Loading build output…
+            </p>
+          {:else if buildLog?.exists}
+            <LogStream lines={buildLog.lines} height="52vh" />
+            <div class="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px]">
+              <span>{buildLog.lines.length} lines · from {relTime(buildLog.at)}</span>
+              <Button variant="ghost" size="sm" class="ml-auto h-7 rounded-lg" onclick={loadBuildLog}>
+                Reload
+              </Button>
+            </div>
+          {:else}
+            <p class="text-muted-foreground py-14 text-center text-sm">
+              No build has been run through the panel for {app.name}.
+            </p>
+          {/if}
         </Card.Content>
       </Card.Root>
     </Tabs.Content>

@@ -180,7 +180,10 @@ and reconnects to the daemon on its own.
   per zone with a Check that resolves against 1.1.1.1 and 8.8.8.8.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail in tabs — Overview, Environment, Database, Logs — with a live log
-  stream. The Database tab attaches any saved connection, local or remote:
+  stream, and a Build view beside it holding the output of the last build the
+  panel ran. A failed first build still creates the app — stopped, so you can
+  read the output and start it once the build is fixed. The Database tab
+  attaches any saved connection, local or remote:
   its connection string is written into the project's `.env` as
   `DATABASE_URL` (or `MONGODB_URI`, `REDIS_URL`) and the app restarts. Environment variables are editable there: saving rewrites the app's
   environment and restarts it. The deploy wizard checks the port is actually

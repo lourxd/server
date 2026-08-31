@@ -228,14 +228,15 @@ async function startProcess(body) {
   }
 
   const buildOutput = STACK_BY_ID[body.stack]?.defaults?.buildOutput;
-  if (buildOutput && !fs.existsSync(path.join(cwd, buildOutput))) {
+  const missingBuild = !!buildOutput && !fs.existsSync(path.join(cwd, buildOutput));
+  if (missingBuild && !body.registerOnly) {
     error(
       400,
       `No build output at ${path.join(cwd, buildOutput)}. Run the build step before starting, or the process will exit immediately and restart until PM2 gives up.`,
     );
   }
 
-  await assertPortFree(env.PORT, { force: body.forcePort });
+  await assertPortFree(env.PORT, { force: body.forcePort || body.registerOnly });
 
   const script = String(body.script || '').trim();
   if (!script) error(400, 'A script or ecosystem file is required.');

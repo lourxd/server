@@ -342,14 +342,21 @@
   }
 
   async function deploy() {
-    if (runBuild && buildCmd && !(await runBuildStep())) return;
+    const built = runBuild && buildCmd ? await runBuildStep() : true;
     try {
-      const payload = { action: 'start', ...form, stack: stackId };
+      const payload = { action: 'start', ...form, stack: stackId, registerOnly: !built };
       if (isStatic) {
         payload.serve = { dir: form.serveDir, port: Number(form.servePort), spa: form.serveSpa };
       }
-      await api('/api/apps', payload);
-      toasts.ok('App deployed', form.name || form.script || form.serveDir);
+      const res = await api('/api/apps', payload);
+      if (res?.registered) {
+        toasts.error(
+          'Build failed — app created but not started',
+          `Fix the build, then start ${form.name} from its page. The output is on its Logs tab.`,
+        );
+      } else {
+        toasts.ok('App deployed', form.name || form.script || form.serveDir);
+      }
       buildLines = [];
       wizardOpen = false;
     } catch {
