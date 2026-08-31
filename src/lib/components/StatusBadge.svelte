@@ -14,15 +14,22 @@
     errored: 'bg-bad/16 text-bad',
     error: 'bg-bad/16 text-bad',
   };
+
+  const LABEL = {
+    'waiting restart': 'restarting',
+    'one-launch-status': 'ran once',
+  };
+
+  const label = $derived(LABEL[status] ?? status);
 </script>
 
 <span
   class={cn(
-    'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium',
+    'inline-flex h-6 max-w-full shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium',
     TONE[status] ?? 'bg-foreground/7 text-idle',
     className,
   )}
 >
-  <span class="dot"></span>
-  {status}
+  <span class="dot shrink-0"></span>
+  <span class="truncate" title={status}>{label}</span>
 </span>

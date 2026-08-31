@@ -4,7 +4,7 @@
   import { cn } from '$lib/utils.js';
   import { STACKS, STACK_BY_ID, detectStack } from '$lib/stacks.js';
   import { onMount } from 'svelte';
-  import { invalidateAll, replaceState } from '$app/navigation';
+  import { goto, invalidateAll, replaceState } from '$app/navigation';
   import { page } from '$app/state';
 
   import * as Card from '$lib/components/ui/card/index.js';
@@ -95,6 +95,8 @@
   let localRepo = $state('');
   let installDeps = $state(true);
 
+  let phase = $state('form');
+  let deployResult = $state(null);
   let runBuild = $state(true);
   let building = $state(false);
   let buildFailed = $state(false);
@@ -148,6 +150,12 @@
     url.searchParams.delete('deploy');
     replaceState(url, {});
   });
+
+  function seeApp() {
+    const id = deployResult?.pmId;
+    wizardOpen = false;
+    if (id != null) goto(`/apps/${id}`);
+  }
 
   function openWizard() {
     step = 1;
@@ -342,25 +350,30 @@
   }
 
   async function deploy() {
+    phase = 'running';
+    deployResult = null;
+
     const built = runBuild && buildCmd ? await runBuildStep() : true;
+
     try {
       const payload = { action: 'start', ...form, stack: stackId, registerOnly: !built };
       if (isStatic) {
         payload.serve = { dir: form.serveDir, port: Number(form.servePort), spa: form.serveSpa };
       }
-      const res = await api('/api/apps', payload);
-      if (res?.registered) {
-        toasts.error(
-          'Build failed — app created but not started',
-          `Fix the build, then start ${form.name} from its page. The output is on its Logs tab.`,
-        );
-      } else {
-        toasts.ok('App deployed', form.name || form.script || form.serveDir);
-      }
-      buildLines = [];
-      wizardOpen = false;
-    } catch {
+      const res = await api('/api/apps', payload, { quiet: true });
+      const started = Array.isArray(res?.result) ? res.result[0] : res?.result;
+      deployResult = {
+        ok: !res?.registered,
+        registered: !!res?.registered,
+        pmId: started?.pm2_env?.pm_id ?? started?.pm_id ?? null,
+        name: form.name || form.script || form.serveDir,
+      };
+    } catch (err) {
+      deployResult = { ok: false, failed: true, error: err.message, name: form.name };
     }
+
+    phase = 'done';
+    await invalidateAll();
   }
 
   async function startFromEcosystem() {
@@ -589,18 +602,21 @@
   >
     <Dialog.Header>
       <Dialog.Title>
-        {#if step === 1}What are you deploying?
+        {#if phase !== 'form'}Deploying {form.name || stack?.name}
+        {:else if step === 1}What are you deploying?
         {:else if step === 2}Import {stack?.name} project
         {:else}Configure {stack?.name}{/if}
       </Dialog.Title>
       <Dialog.Description>
-        {#if step === 1}Pick a stack and the sensible defaults are filled in for you.
+        {#if phase !== 'form'}The dialog stays until you close it, so nothing scrolls past.
+        {:else if step === 1}Pick a stack and the sensible defaults are filled in for you.
         {:else if step === 2}Bring in the code from GitHub, any git URL, or a project already on this server.
         {:else}{stack?.summary}{/if}
       </Dialog.Description>
     </Dialog.Header>
 
-        <div class="text-muted-foreground flex items-center gap-1.5 text-xs">
+    {#if phase === 'form'}
+      <div class="text-muted-foreground flex items-center gap-1.5 text-xs">
       {#each ['Stack', 'Source', 'Configure'] as label, i (label)}
         {@const n = i + 1}
         <span class={cn('flex items-center gap-1.5', step >= n && 'text-foreground font-medium')}>
@@ -614,11 +630,66 @@
           </span>
           {label}
         </span>
-        {#if n < 3}<span class="bg-border h-px w-4"></span>{/if}
-      {/each}
-    </div>
+          {#if n < 3}<span class="bg-border h-px w-4"></span>{/if}
+        {/each}
+      </div>
+    {/if}
 
-    {#if step === 1}
+    {#if phase !== 'form'}
+      <div class="space-y-3.5">
+        <div
+          class={cn(
+            'flex items-center gap-3.5 rounded-2xl p-4',
+            phase === 'running'
+              ? 'accent-wash'
+              : deployResult?.ok
+                ? 'bg-ok/8 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ok)_28%,transparent)]'
+                : 'bg-bad/8 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--bad)_28%,transparent)]',
+          )}
+        >
+          <div class="grid size-9 shrink-0 place-items-center rounded-xl bg-foreground/8">
+            {#if phase === 'running'}
+              <LoaderCircle class="size-4.5 animate-spin" />
+            {:else if deployResult?.ok}
+              <Check class="text-ok size-4.5" />
+            {:else}
+              <TriangleAlert class="text-bad size-4.5" />
+            {/if}
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-[14px] font-semibold">
+              {#if phase === 'running'}
+                {building ? `Running ${buildCmd}` : 'Starting the app'}
+              {:else if deployResult?.ok}
+                {deployResult.name} is running
+              {:else if deployResult?.registered}
+                Build failed — {deployResult.name} was created but not started
+              {:else}
+                Could not deploy {deployResult?.name}
+              {/if}
+            </p>
+            <p class="text-muted-foreground mt-0.5 text-[11.5px]">
+              {#if phase === 'running'}
+                Output appears below as it happens.
+              {:else if deployResult?.ok}
+                Started under PM2 and supervised from now on.
+              {:else if deployResult?.registered}
+                Fix the build and start it from its page — this output is kept on its Logs tab.
+              {:else}
+                {deployResult?.error}
+              {/if}
+            </p>
+          </div>
+        </div>
+
+        {#if buildLines.length}
+          <LogStream lines={buildLines} failed={buildFailed} height="46vh" />
+        {:else if phase === 'running'}
+          <p class="text-muted-foreground py-6 text-center text-sm">Waiting for output…</p>
+        {/if}
+      </div>
+
+    {:else if step === 1}
       <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {#each STACKS as s (s.id)}
           <button
@@ -1068,7 +1139,20 @@
     {/if}
 
     <Dialog.Footer>
-      {#if step === 1}
+      {#if phase !== 'form'}
+        <Button variant="outline" disabled={phase === 'running'} onclick={() => (wizardOpen = false)}>
+          Close
+        </Button>
+        {#if phase === 'done' && deployResult?.pmId != null}
+          <Button class="accent-fill rounded-xl px-4 font-semibold" onclick={seeApp}>
+            See app <ArrowRight class="size-4" />
+          </Button>
+        {:else if phase === 'done'}
+          <Button class="accent-fill rounded-xl px-4 font-semibold" onclick={() => (phase = 'form')}>
+            <ArrowLeft class="size-4" /> Back to settings
+          </Button>
+        {/if}
+      {:else if step === 1}
         <Button variant="outline" onclick={() => (wizardOpen = false)}>Cancel</Button>
       {:else if step === 2}
         <Button variant="outline" disabled={importing} onclick={() => (step = 1)}>
