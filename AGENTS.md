@@ -504,6 +504,15 @@ Do not treat these as bugs to discover — they are known and deferred.
   Running an authoritative nameserver on the box is not viable: port 53 is
   EACCES for the panel's user, `systemd-resolved` already holds 127.0.0.53:53,
   and the machine is behind NAT (192.168.50.227 vs 85.246.175.66).
+- **A clustered app is many PM2 processes and one app.** `instances: "max"` in
+  an ecosystem file means one process per core — 16 on this machine — and the
+  list showed 16 rows, which reads as 16 apps appearing from one click.
+  `live-group.js` groups by name: one entry carrying the instance count, summed
+  cpu and memory, and the worst instance's status so a single failure stays
+  visible. Actions on a grouped app target the NAME, since a pm_id only reaches
+  one instance. Starting from an ecosystem file now says how many processes it
+  will create first, read by requiring the file in a child process rather than
+  in the panel.
 - **A tunnel connector is a PM2 process, and must not read as an app.**
   `shapeProcess` sets `kind` from `SCP_KIND`, falling back to a `tunnel-` name
   prefix for ones started before the marker existed. `live.apps` filters them

@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { run, runStreaming } from './exec.js';
 import { settings } from './store/settings.js';
 import { cached, invalidate } from './cache.js';
@@ -409,6 +410,39 @@ export async function gitAction(relPath, action, payload = {}, onLine = () => {}
     default:
       throw new Error(`Unknown repository action: ${action}`);
   }
+}
+
+export async function inspectEcosystem(relPath, file) {
+  const dir = safeRepoPath(relPath);
+  const target = path.join(dir, path.basename(String(file ?? '')));
+  if (!fss.existsSync(target)) throw new Error(`Ecosystem file not found: ${target}`);
+
+  const reader = `
+    const c = require(process.argv[1]);
+    const apps = Array.isArray(c.apps) ? c.apps : Array.isArray(c) ? c : [c];
+    process.stdout.write(JSON.stringify(apps.map((a) => ({
+      name: a.name ?? null,
+      script: a.script ?? null,
+      execMode: a.exec_mode ?? 'fork',
+      instances: a.instances ?? 1,
+    }))));
+  `;
+
+  const res = await run(process.execPath, ['-e', reader, target], { cwd: dir, timeout: 10_000 });
+  if (!res.ok) throw new Error(`Could not read ${path.basename(target)}: ${res.stderr || 'unknown error'}`);
+
+  const cores = os.cpus().length;
+  const apps = JSON.parse(res.stdout).map((a) => ({
+    ...a,
+    processes:
+      a.execMode === 'cluster'
+        ? a.instances === 'max' || a.instances === -1 || a.instances === 0
+          ? cores
+          : Number(a.instances) || 1
+        : 1,
+  }));
+
+  return { file: path.basename(target), cores, apps, processes: apps.reduce((n, a) => n + a.processes, 0) };
 }
 
 export async function deleteRepo(relPath) {

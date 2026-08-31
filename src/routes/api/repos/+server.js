@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { listRepos, repoInfo, safeRepoPath, deleteRepo, githubRepos } from '$srv/repos.js';
+import { listRepos, repoInfo, safeRepoPath, deleteRepo, githubRepos, inspectEcosystem } from '$srv/repos.js';
 
 export async function GET({ url }) {
   const rel = url.searchParams.get('path');
@@ -7,6 +7,9 @@ export async function GET({ url }) {
   try {
     if (source === 'github') {
       return json(await githubRepos({ q: url.searchParams.get('q') || '' }));
+    }
+    if (source === 'ecosystem') {
+      return json(await inspectEcosystem(rel, url.searchParams.get('file')));
     }
     if (rel) return json(await repoInfo(safeRepoPath(rel), { detailed: true }));
     return json(await listRepos());

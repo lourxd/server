@@ -273,6 +273,7 @@
     imported = { relPath, pkg: repo?.pkg ?? null };
     applyStackDefaults(relPath, imported.pkg);
     queuePortCheck(isStatic ? form.servePort : form.envVars.find((v) => v.key === 'PORT')?.value);
+    loadEcosystem(data.repos.find((r) => r.relPath === relPath));
     toasts.ok('Repository imported', relPath);
     step = 3;
   }
@@ -283,6 +284,7 @@
     imported = { relPath: localRepo, pkg: repo?.pkg ?? null };
     applyStackDefaults(localRepo, imported.pkg);
     queuePortCheck(isStatic ? form.servePort : form.envVars.find((v) => v.key === 'PORT')?.value);
+    loadEcosystem(repo);
     step = 3;
   }
 
@@ -376,6 +378,24 @@
     await invalidateAll();
   }
 
+  let ecosystem = $state(null);
+  let ecosystemError = $state(null);
+
+  async function loadEcosystem(repo) {
+    ecosystem = null;
+    ecosystemError = null;
+    if (!repo?.ecosystemFile) return;
+    try {
+      ecosystem = await apiGet(
+        '/api/repos',
+        { source: 'ecosystem', path: repo.relPath, file: repo.ecosystemFile },
+        { quiet: true },
+      );
+    } catch (err) {
+      ecosystemError = err.message;
+    }
+  }
+
   async function startFromEcosystem() {
     await api('/api/apps', { action: 'start', cwd: form.cwd, ecosystem: selectedRepo.ecosystemFile });
     toasts.ok('Started from ecosystem file', selectedRepo.ecosystemFile);
@@ -397,10 +417,12 @@
     busy = next;
   }
 
+  const targetOf = (app) => (app.instances > 1 ? { name: app.name } : { id: app.pmId });
+
   async function act(app, action) {
     setBusy(app.pmId, true);
     try {
-      await api('/api/apps', { action, id: app.pmId });
+      await api('/api/apps', { action, ...targetOf(app) });
       toasts.ok(`${app.name} ${action}ed`);
     } catch {
     } finally {
@@ -414,7 +436,7 @@
       description: `This removes "${app.name}" from PM2 entirely. Files on disk are untouched, but the app stops and disappears from this list.`,
       label: 'Delete app',
       action: async () => {
-        await api('/api/apps', { action: 'delete', id: app.pmId });
+        await api('/api/apps', { action: 'delete', ...targetOf(app) });
         toasts.ok('App deleted', app.name);
       },
     };
@@ -903,17 +925,52 @@
         {/if}
 
         {#if selectedRepo?.ecosystemFile}
-          <Alert.Root>
-            <Alert.Description class="space-y-2">
-              <p class="text-xs">
-                This project has <code class="font-mono">{selectedRepo.ecosystemFile}</code>. Starting from
-                it uses the settings it declares and ignores everything below.
-              </p>
-              <Button size="sm" class="h-7" onclick={startFromEcosystem}>
-                Use {selectedRepo.ecosystemFile}
-              </Button>
-            </Alert.Description>
-          </Alert.Root>
+          <div class="panel space-y-3 rounded-xl p-3.5">
+            <p class="text-[12.5px]">
+              This project has <code class="font-mono">{selectedRepo.ecosystemFile}</code>. Starting
+              from it uses the settings it declares and ignores everything below.
+            </p>
+
+            {#if ecosystem}
+              <div class="space-y-1.5">
+                {#each ecosystem.apps as a (a.name)}
+                  <div class="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+                    <span class="font-semibold">{a.name}</span>
+                    <span class="text-muted-foreground">{a.script}</span>
+                    <span class="text-muted-foreground ml-auto">
+                      {a.execMode}{a.instances === 'max' ? ' · max' : ''}
+                    </span>
+                    <span class={cn(a.processes > 1 && 'text-warn')}>
+                      {a.processes} process{a.processes === 1 ? '' : 'es'}
+                    </span>
+                  </div>
+                {/each}
+              </div>
+
+              {#if ecosystem.processes > 1}
+                <Alert.Root>
+                  <TriangleAlert class="size-4" />
+                  <Alert.Description class="text-xs">
+                    This starts <strong>{ecosystem.processes} processes</strong> on this machine —
+                    the file asks for cluster mode across {ecosystem.cores} cores. They run as one
+                    app and are managed together.
+                  </Alert.Description>
+                </Alert.Root>
+              {/if}
+            {:else if ecosystemError}
+              <p class="text-bad text-[11.5px]">{ecosystemError}</p>
+            {/if}
+
+            <Button
+              size="sm"
+              variant="outline"
+              class="h-7"
+              disabled={!!ecosystemError}
+              onclick={startFromEcosystem}
+            >
+              Use {selectedRepo.ecosystemFile}
+            </Button>
+          </div>
         {/if}
 
         <div class="accent-wash rounded-xl p-3.5">

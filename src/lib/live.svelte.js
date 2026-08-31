@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { groupInstances } from './live-group.js';
 
 class LiveState {
   connected = $state(false);
@@ -61,7 +62,7 @@ class LiveState {
     return () => this.#logHandlers.delete(fn);
   }
 
-  get apps() { return this.all.filter((a) => a.kind !== 'tunnel'); }
+  get apps() { return groupInstances(this.all.filter((a) => a.kind !== 'tunnel')); }
   get connectors() { return this.all.filter((a) => a.kind === 'tunnel'); }
 
   get online() { return this.apps.filter((a) => a.status === 'online').length; }
