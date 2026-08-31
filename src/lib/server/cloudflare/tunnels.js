@@ -376,6 +376,38 @@ export async function createQuickTunnel({ name, service }) {
   return { ok: true, id };
 }
 
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function remoteTunnel(account, cfTunnelId) {
+  try {
+    return await cf(`/accounts/${account}/cfd_tunnel/${cfTunnelId}`);
+  } catch (err) {
+    if (/404|not found/i.test(err.message)) return null;
+    throw err;
+  }
+}
+
+async function drainConnections(account, cfTunnelId, onLine = () => {}) {
+  await cf(`/accounts/${account}/cfd_tunnel/${cfTunnelId}/connections`, { method: 'DELETE' }).catch(
+    () => {},
+  );
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const remote = await remoteTunnel(account, cfTunnelId);
+    if (!remote) return true;
+
+    const open = (remote.connections ?? []).length;
+    if (open === 0) return true;
+
+    onLine(`waiting for ${open} connection${open === 1 ? '' : 's'} to close`);
+    await wait(1500);
+    await cf(`/accounts/${account}/cfd_tunnel/${cfTunnelId}/connections`, { method: 'DELETE' }).catch(
+      () => {},
+    );
+  }
+  return false;
+}
+
 export async function deleteTunnel(tunnelId, { deleteRemote = true } = {}) {
   const tunnel = await getTunnel(tunnelId);
 
@@ -389,15 +421,33 @@ export async function deleteTunnel(tunnelId, { deleteRemote = true } = {}) {
     }
   }
 
+  let removedRemotely = false;
+
   if (deleteRemote && tunnel.kind === 'named' && tunnel.cfTunnelId) {
-    await cf(`/accounts/${tunnel.accountId}/cfd_tunnel/${tunnel.cfTunnelId}`, { method: 'DELETE' }).catch((err) => {
-      console.warn('[tunnels] remote delete failed:', err.message);
-    });
+    const account = tunnel.accountId ?? accountId();
+    if (!account) throw new CloudflareError('No Cloudflare account is configured, so the tunnel cannot be deleted there.');
+
+    await drainConnections(account, tunnel.cfTunnelId);
+
+    try {
+      await cf(`/accounts/${account}/cfd_tunnel/${tunnel.cfTunnelId}`, { method: 'DELETE' });
+      removedRemotely = true;
+    } catch (err) {
+      const remote = await remoteTunnel(account, tunnel.cfTunnelId).catch(() => null);
+      if (!remote || remote.deleted_at) {
+        removedRemotely = true;
+      } else {
+        throw new CloudflareError(
+          `${tunnel.name} was stopped here, but Cloudflare would not delete it: ${err.message}. ` +
+            'It is still in your account — try again in a moment, or remove it from the Cloudflare dashboard.',
+        );
+      }
+    }
   }
 
   await db.delete(tunnels).where(eq(tunnels.id, tunnelId));
   invalidate('cf:tunnels');
-  return { ok: true };
+  return { ok: true, removedRemotely };
 }
 
 export async function tunnelHealth(tunnelId) {

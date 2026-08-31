@@ -125,11 +125,14 @@
   function askDelete(tunnel) {
     confirmState = {
       title: `Delete ${tunnel.name}?`,
-      description: `The connector stops, the tunnel is deleted from Cloudflare, and every hostname routed through it (${tunnel.routes.map((r) => r.hostname).join(', ') || 'none'}) stops resolving.`,
+      description: `The connector stops here, the tunnel is deleted from your Cloudflare account, and every hostname routed through it (${tunnel.routes.map((r) => r.hostname).join(', ') || 'none'}) stops resolving. Cloudflare will not delete a tunnel while it still has open connections, so this waits for them to close.`,
       label: 'Delete tunnel',
       action: async () => {
-        await api('/api/tunnels', { action: 'delete', id: tunnel.id });
-        toasts.ok('Tunnel deleted', tunnel.name);
+        const res = await api('/api/tunnels', { action: 'delete', id: tunnel.id });
+        toasts.ok(
+          'Tunnel deleted',
+          res?.removedRemotely ? `${tunnel.name} removed from Cloudflare too` : tunnel.name,
+        );
         await invalidateAll();
       },
     };

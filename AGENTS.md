@@ -547,6 +547,14 @@ Do not treat these as bugs to discover — they are known and deferred.
   so comparing against an expected CNAME or the server's own IP reports a
   working domain as broken. Cloudflare zone access stays where it is genuinely
   needed: creating a tunnel route writes the CNAME for you.
+- **Cloudflare refuses to delete a tunnel that still has open connections.**
+  Stopping the connector does not close them immediately — a healthy tunnel here
+  holds four — so a delete issued straight afterwards fails. `deleteTunnel`
+  calls the connections cleanup endpoint and polls until they drop before
+  deleting, and if the delete still fails it re-reads the tunnel: gone or
+  `deleted_at` counts as success, anything else throws and the local record is
+  KEPT. Swallowing that error is what leaves a tunnel in the account with
+  nothing in the panel pointing at it.
 - **Tunnels and DNS are pages of their own.** They were tabs on Network for a
   while; ingress is used far more than interface telemetry and buried badly
   there. Network is machine networking again — throughput, interfaces, listening
