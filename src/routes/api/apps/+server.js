@@ -193,12 +193,6 @@ async function updateEnv(body) {
 async function startProcess(body) {
   const cwd = safeRepoPath(body.cwd || '');
 
-  if (body.ecosystem) {
-    const file = path.join(cwd, path.basename(body.ecosystem));
-    if (!fs.existsSync(file)) error(400, `Ecosystem file not found: ${file}`);
-    return pm2.startFromFile(file);
-  }
-
   let split;
   try {
     split = splitEnv(body.envVars, readEnvFile(cwd));

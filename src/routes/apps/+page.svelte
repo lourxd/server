@@ -3,6 +3,7 @@
   import { bytes, duration, num, relTime } from '$lib/format.js';
   import { cn } from '$lib/utils.js';
   import { STACKS, STACK_BY_ID, detectStack } from '$lib/stacks.js';
+  import { looksSecret } from '$lib/env-format.js';
   import { onMount } from 'svelte';
   import { goto, invalidateAll, replaceState } from '$app/navigation';
   import { page } from '$app/state';
@@ -379,11 +380,13 @@
   }
 
   let ecosystem = $state(null);
+  let ecosystemApplied = $state(null);
   let ecosystemError = $state(null);
 
   async function loadEcosystem(repo) {
     ecosystem = null;
     ecosystemError = null;
+    ecosystemApplied = null;
     if (!repo?.ecosystemFile) return;
     try {
       ecosystem = await apiGet(
@@ -396,11 +399,30 @@
     }
   }
 
-  async function startFromEcosystem() {
-    await api('/api/apps', { action: 'start', cwd: form.cwd, ecosystem: selectedRepo.ecosystemFile });
-    toasts.ok('Started from ecosystem file', selectedRepo.ecosystemFile);
-    wizardOpen = false;
+  function applyEcosystem(app) {
+    form = {
+      ...form,
+      name: app.name || form.name,
+      script: app.script || form.script,
+      args: app.args ?? '',
+      execMode: app.execMode === 'cluster' ? 'cluster' : 'fork',
+      instances: app.processes ?? 1,
+      watch: !!app.watch,
+      autorestart: app.autorestart !== false,
+      maxMemory: app.maxMemory ?? '',
+      interpreter: app.interpreter ?? '',
+      envVars: Object.entries(app.env ?? {}).map(([key, value]) => ({
+        key,
+        value: String(value),
+        secret: looksSecret(key),
+      })),
+    };
+
+    ecosystemApplied = app.name;
+    queuePortCheck(form.envVars.find((v) => v.key === 'PORT')?.value);
+    toasts.ok(`Filled in from ${selectedRepo.ecosystemFile}`, 'Review it, then deploy.');
   }
+
 
   const shown = $derived.by(() => {
     const q = query.trim().toLowerCase();
@@ -937,6 +959,11 @@
                   <div class="flex flex-wrap items-center gap-2 font-mono text-[11px]">
                     <span class="font-semibold">{a.name}</span>
                     <span class="text-muted-foreground">{a.script}</span>
+                    {#if Object.keys(a.env ?? {}).length}
+                      <span class="text-muted-foreground">
+                        {Object.keys(a.env).length} vars
+                      </span>
+                    {/if}
                     <span class="text-muted-foreground ml-auto">
                       {a.execMode}{a.instances === 'max' ? ' · max' : ''}
                     </span>
@@ -961,15 +988,25 @@
               <p class="text-bad text-[11.5px]">{ecosystemError}</p>
             {/if}
 
-            <Button
-              size="sm"
-              variant="outline"
-              class="h-7"
-              disabled={!!ecosystemError}
-              onclick={startFromEcosystem}
-            >
-              Use {selectedRepo.ecosystemFile}
-            </Button>
+            {#if ecosystem}
+              <div class="flex flex-wrap items-center gap-2">
+                {#each ecosystem.apps as a (a.name)}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    class="h-7"
+                    onclick={() => applyEcosystem(a)}
+                  >
+                    {ecosystem.apps.length > 1 ? `Fill in ${a.name}` : 'Fill in these settings'}
+                  </Button>
+                {/each}
+                {#if ecosystemApplied}
+                  <span class="text-ok flex items-center gap-1.5 text-[11.5px]">
+                    <Check class="size-3.5" /> filled in — review below, then deploy
+                  </span>
+                {/if}
+              </div>
+            {/if}
           </div>
         {/if}
 

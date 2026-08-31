@@ -423,8 +423,16 @@ export async function inspectEcosystem(relPath, file) {
     process.stdout.write(JSON.stringify(apps.map((a) => ({
       name: a.name ?? null,
       script: a.script ?? null,
+      args: Array.isArray(a.args) ? a.args.join(' ') : (a.args ?? ''),
+      cwd: a.cwd ?? null,
       execMode: a.exec_mode ?? 'fork',
       instances: a.instances ?? 1,
+      interpreter: a.interpreter && a.interpreter !== 'node' ? a.interpreter : '',
+      maxMemory: a.max_memory_restart ?? '',
+      watch: !!a.watch,
+      autorestart: a.autorestart !== false,
+      env: { ...(a.env ?? {}), ...(a.env_production ?? {}) },
+      hasProductionEnv: !!a.env_production,
     }))));
   `;
 

@@ -241,10 +241,6 @@ export async function start(options) {
   return call('start', { ...options, env: sanitizeEnv(options.env) });
 }
 
-export async function startFromFile(filePath) {
-  return call('start', filePath);
-}
-
 export async function dump() {
   return new Promise((resolve, reject) => {
     connect().then(() => {
