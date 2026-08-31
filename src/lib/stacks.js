@@ -8,6 +8,7 @@ export const STACKS = [
     detect: ['next'],
     clusterable: true,
     defaults: {
+      buildMarker: '.next/BUILD_ID',
       buildOutput: '.next',
       build: 'npm run build',
       script: 'node_modules/next/dist/bin/next',
@@ -26,6 +27,7 @@ export const STACKS = [
     detect: ['@sveltejs/kit'],
     clusterable: true,
     defaults: {
+      buildMarker: 'build/index.js',
       buildOutput: 'build',
       build: 'npm run build',
       script: 'build/index.js',
@@ -82,6 +84,7 @@ export const STACKS = [
     detect: ['nuxt'],
     clusterable: true,
     defaults: {
+      buildMarker: '.output/server/index.mjs',
       buildOutput: '.output',
       build: 'npm run build',
       script: '.output/server/index.mjs',
@@ -100,6 +103,7 @@ export const STACKS = [
     detect: ['astro'],
     clusterable: true,
     defaults: {
+      buildMarker: 'dist/server/entry.mjs',
       buildOutput: 'dist',
       build: 'npm run build',
       script: 'dist/server/entry.mjs',

@@ -369,11 +369,15 @@ that cannot build — `Cannot find module '@tailwindcss/postcss'` and friends. T
 install action now unsets `NODE_ENV` for the child (pass `null` in `env` and
 `childEnv()` deletes the key) and passes `--include=dev` for npm.
 
-**A failed Next.js build poisons the next one.** Turbopack leaves partial chunks
-in `.next`, and the retry fails with the identical error even after the real
-cause is fixed. `rm -rf .next` before rebuilding. The panel does not do this
-automatically — deleting a user's build output on their behalf is not ours to
-decide.
+**A failed Next.js build poisons the next one, and leaves a directory that
+looks like a build.** Turbopack writes partial chunks into `.next` before
+failing, so the retry fails identically AND `fs.existsSync('.next')` says the
+build is fine. Checking the output directory is not enough: stacks declare a
+`buildMarker` — the file only a finished build produces (`.next/BUILD_ID`,
+`build/index.js`, `.output/server/index.mjs`, `dist/server/entry.mjs`) — and the
+start guard checks that. The build step deletes an output directory that exists
+without its marker before rebuilding, which is safe because it is provably not a
+build; it never deletes anything else, and the path is confined to the project.
 
 **Never run `npm run build` against a live panel — use `npm run build:safe`.**
 `vite build` rewrites `build/` in place, deleting and re-emitting hashed chunks,

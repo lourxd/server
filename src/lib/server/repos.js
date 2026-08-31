@@ -370,6 +370,17 @@ export async function gitAction(relPath, action, payload = {}, onLine = () => {}
     case 'run-script': {
       const script = String(payload.script || '').trim();
       if (!script || !/^[A-Za-z0-9:._-]+$/.test(script)) throw new Error('Invalid script name.');
+
+      if (payload.clean) {
+        const target = path.resolve(dir, String(payload.clean));
+        const root = path.resolve(dir);
+        if (!target.startsWith(root + path.sep)) throw new Error('Refusing to clean outside the project.');
+        if (fss.existsSync(target)) {
+          emit({ stream: 'out', line: `$ rm -rf ${payload.clean}   (incomplete build from a previous run)` });
+          fss.rmSync(target, { recursive: true, force: true });
+        }
+      }
+
       const pm = detectPackageManager(dir) || 'npm';
       emit({ stream: 'out', line: `$ ${pm} run ${script}` });
       return runStreaming(pm, ['run', script], { ...opts, timeout: 900_000 }, emit);

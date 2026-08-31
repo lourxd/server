@@ -258,12 +258,18 @@ async function startProcess(body) {
     });
   }
 
-  const buildOutput = STACK_BY_ID[body.stack]?.defaults?.buildOutput;
-  const missingBuild = !!buildOutput && !fs.existsSync(path.join(cwd, buildOutput));
+  const stackDefaults = STACK_BY_ID[body.stack]?.defaults;
+  const buildOutput = stackDefaults?.buildOutput;
+  const buildProof = stackDefaults?.buildMarker ?? buildOutput;
+  const missingBuild = !!buildProof && !fs.existsSync(path.join(cwd, buildProof));
+
   if (missingBuild && !body.registerOnly) {
+    const dirExists = buildOutput && fs.existsSync(path.join(cwd, buildOutput));
     error(
       400,
-      `No build output at ${path.join(cwd, buildOutput)}. Run the build step before starting, or the process will exit immediately and restart until PM2 gives up.`,
+      dirExists
+        ? `${buildOutput} exists but holds no finished build — ${buildProof} is missing, which usually means the build failed part way. Delete ${buildOutput} and build again.`
+        : `No build output at ${path.join(cwd, buildOutput ?? buildProof)}. Run the build step before starting, or the process will exit immediately and restart until PM2 gives up.`,
     );
   }
 
