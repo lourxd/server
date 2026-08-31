@@ -4,6 +4,7 @@ import path from 'node:path';
 import * as pm2 from '$srv/pm2.js';
 import { tail } from '$srv/logs.js';
 import { listConnections } from '$srv/db/index.js';
+import { settings } from '$srv/store/settings.js';
 import { isRemote, ENGINES } from '$srv/db/provision.js';
 
 function secretKeys(cwd) {
@@ -39,6 +40,7 @@ export async function load({ params }) {
       proc,
       initialLogs: logs.lines,
       envVars,
+      relPath: proc.cwd ? path.relative(path.resolve(settings().projectsDir), proc.cwd) : null,
       databases: connections.map((c) => ({ ...c, remote: isRemote(c) })),
       catalogue: ENGINES,
       attached: { id: proc.env?.SCP_DB ?? null, varName: proc.env?.SCP_DB_VAR ?? null },

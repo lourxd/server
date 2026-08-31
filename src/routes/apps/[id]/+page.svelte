@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { goto, invalidateAll } from '$app/navigation';
-  import { live, api, apiGet, toasts } from '$lib/live.svelte.js';
+  import { live, api, apiGet, streamPost, toasts } from '$lib/live.svelte.js';
   import { bytes, duration, num, relTime } from '$lib/format.js';
 
   import * as Card from '$lib/components/ui/card/index.js';
@@ -32,6 +32,7 @@
   import Save from '@lucide/svelte/icons/save';
   import Database from '@lucide/svelte/icons/database';
   import Link2Off from '@lucide/svelte/icons/link-2-off';
+  import Hammer from '@lucide/svelte/icons/hammer';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 
   let { data } = $props();
@@ -45,6 +46,53 @@
   let envConfirm = $state(false);
 
   const envDirty = $derived(JSON.stringify(envVars) !== JSON.stringify(data.envVars));
+
+  const stackDefaults = $derived(app.stack ? (STACK_BY_ID[app.stack]?.defaults ?? null) : null);
+  const canRebuild = $derived(!!stackDefaults?.build && !!data.relPath && !data.relPath.startsWith('..'));
+
+  let rebuilding = $state(false);
+  let rebuildLines = $state([]);
+  let rebuildFailed = $state(false);
+
+  async function rebuild() {
+    rebuilding = true;
+    rebuildFailed = false;
+    rebuildLines = [];
+    logKind = 'build';
+    let ok = false;
+    try {
+      await streamPost(
+        '/api/repos/run',
+        {
+          action: 'run-script',
+          script: 'build',
+          path: data.relPath,
+          buildLogFor: app.name,
+          clean: stackDefaults.buildOutput || undefined,
+        },
+        (event, payload) => {
+          if (event === 'line') rebuildLines = [...rebuildLines, payload];
+          if (event === 'done') ok = payload.ok;
+        },
+      );
+    } catch (err) {
+      rebuildLines = [...rebuildLines, { stream: 'err', line: err.message }];
+    }
+    rebuilding = false;
+    rebuildFailed = !ok;
+
+    if (!ok) {
+      toasts.error('Build failed', 'The app was left as it was — see the output.');
+      return;
+    }
+
+    try {
+      await api('/api/apps', { action: 'restart', id: data.proc.pmId });
+      toasts.ok('Rebuilt and restarted', app.name);
+      await invalidateAll();
+    } catch {
+    }
+  }
 
   let logKind = $state('runtime');
   let buildLog = $state(null);
@@ -200,6 +248,22 @@
   </div>
 
   <div class="ml-auto flex flex-wrap items-center gap-2">
+    {#if canRebuild}
+      <Button
+        variant="ghost"
+        size="sm"
+        class="panel h-8.5 rounded-xl"
+        disabled={rebuilding}
+        onclick={rebuild}
+      >
+        {#if rebuilding}
+          <LoaderCircle class="size-3.5 animate-spin" />
+        {:else}
+          <Hammer class="size-3.5" />
+        {/if}
+        {rebuilding ? 'Building…' : 'Rebuild'}
+      </Button>
+    {/if}
     <Button variant="ghost" size="sm" class="panel h-8.5 rounded-xl" onclick={() => act('restart')}>
       <RotateCw class="size-3.5" /> Restart
     </Button>
@@ -335,6 +399,17 @@
               <span>{logs.length} lines buffered · new output appears live</span>
               <span class="ml-auto font-mono">{app.outLog ?? ''}</span>
             </div>
+          {:else if rebuilding || rebuildLines.length}
+            <LogStream lines={rebuildLines} failed={rebuildFailed} height="52vh" />
+            <p class="text-muted-foreground mt-2 flex items-center gap-2 text-[11.5px]">
+              {#if rebuilding}
+                <LoaderCircle class="size-3.5 animate-spin" /> Building {app.name}…
+              {:else if rebuildFailed}
+                Build failed — the app was left as it was.
+              {:else}
+                Build finished.
+              {/if}
+            </p>
           {:else if buildLoading}
             <p class="text-muted-foreground flex items-center gap-2 py-10 text-center text-sm">
               <LoaderCircle class="size-4 animate-spin" /> Loading build output…

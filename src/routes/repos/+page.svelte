@@ -26,6 +26,7 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import Rocket from '@lucide/svelte/icons/rocket';
   import Package from '@lucide/svelte/icons/package';
+  import Hammer from '@lucide/svelte/icons/hammer';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
@@ -120,6 +121,13 @@
   const pull = (repo) => stream(`Pull ${repo.name}`, { action: 'pull', path: repo.relPath });
   const fetch = (repo) => stream(`Fetch ${repo.name}`, { action: 'fetch', path: repo.relPath });
   const install = (repo) => stream(`Install ${repo.name}`, { action: 'install', path: repo.relPath });
+  const build = (repo) =>
+    stream(`Build ${repo.name}`, {
+      action: 'run-script',
+      script: 'build',
+      path: repo.relPath,
+      buildLogFor: repo.name,
+    });
 
   function askDelete(repo) {
     const apps = appsFor(repo);
@@ -214,6 +222,11 @@
                 {#if repo.packageManager}
                   <DropdownMenu.Item disabled={running} onSelect={() => install(repo)}>
                     <Package class="size-4" /> Install dependencies
+                  </DropdownMenu.Item>
+                {/if}
+                {#if repo.pkg?.scripts?.includes('build')}
+                  <DropdownMenu.Item disabled={running} onSelect={() => build(repo)}>
+                    <Hammer class="size-4" /> Run build
                   </DropdownMenu.Item>
                 {/if}
                 <DropdownMenu.Separator />

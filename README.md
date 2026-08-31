@@ -181,7 +181,9 @@ and reconnects to the daemon on its own.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail in tabs — Overview, Environment, Database, Logs — with a live log
   stream, and a Build view beside it holding the output of the last build the
-  panel ran. A failed first build still creates the app — stopped, so you can
+  panel ran. **Rebuild** runs the project's build and restarts the app on
+  success, streaming into that view; Repositories carries the same action for a
+  project with no app yet. A failed first build still creates the app — stopped, so you can
   read the output and start it once the build is fixed. The Database tab
   attaches any saved connection, local or remote:
   its connection string is written into the project's `.env` as
