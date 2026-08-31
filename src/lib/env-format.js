@@ -54,3 +54,8 @@ export function parseEnvText(text) {
   }
   return rows;
 }
+
+export function mergeEnvRows(current, incoming) {
+  const keys = new Set(incoming.map((r) => r.key));
+  return [...current.filter((v) => !keys.has(v.key)), ...incoming];
+}

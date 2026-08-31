@@ -1,6 +1,6 @@
 <script>
   import { cn } from '$lib/utils.js';
-  import { parseEnvText } from '$lib/env-format.js';
+  import { parseEnvText, mergeEnvRows, looksSecret, ENV_KEY_RE } from '$lib/env-format.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
@@ -21,21 +21,18 @@
 
   let adding = $state(false);
   let draft = $state({ key: '', value: '', secret: false });
-  const parsed = $derived(parseEnvText(pasteText));
-  const usable = $derived(parsed.filter((r) => r.valid));
-  const rejected = $derived(parsed.filter((r) => !r.valid));
+  let pasting = $state(false);
+  let pasteText = $state('');
+  let pasteRows = $state([]);
+  let revealed = $state(new Set());
+
+  const usable = $derived(pasteRows.filter((r) => r.valid));
+  const rejected = $derived(pasteRows.filter((r) => !r.valid));
+  const pastedSecrets = $derived(usable.filter((r) => r.secret).length);
   const existing = $derived(new Set(vars.map((v) => v.key)));
 
   const taken = $derived(vars.some((v) => v.key === draft.key.trim()) && !!draft.key.trim());
-  const suggestSecret = $derived(!draft.secret && SECRET_HINT.test(draft.key));
-
-  let pasting = $state(false);
-  let parsedOverrides = $state({});
-  let pasteText = $state('');
-  let revealed = $state(new Set());
-
-  const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
-  const SECRET_HINT = /(SECRET|TOKEN|KEY|PASSWORD|PASSWD|CREDENTIAL|PRIVATE|DSN|AUTH)/i;
+  const suggestSecret = $derived(!draft.secret && looksSecret(draft.key));
 
   const duplicates = $derived.by(() => {
     const seen = new Map();
@@ -46,7 +43,7 @@
     return new Set([...seen].filter(([, n]) => n > 1).map(([k]) => k));
   });
 
-  const invalid = $derived(vars.filter((v) => v.key && !KEY_RE.test(v.key)).map((v) => v.key));
+  const invalid = $derived(vars.filter((v) => v.key && !ENV_KEY_RE.test(v.key)).map((v) => v.key));
   const secretCount = $derived(vars.filter((v) => v.secret && v.key).length);
 
   export function problems() {
@@ -61,7 +58,7 @@
   function commitAdd() {
     const key = draft.key.trim();
     if (!key) return;
-    vars = [...vars.filter((v) => v.key !== key), { ...draft, key }];
+    vars = mergeEnvRows(vars, [{ ...draft, key }]);
     adding = false;
   }
 
@@ -84,25 +81,31 @@
     revealed = next;
   }
 
-  function togglePasted(i) {
-    parsedOverrides = { ...parsedOverrides, [i]: !kindOf(i) };
+  function onPaste(text) {
+    pasteText = text;
+    pasteRows = parseEnvText(text);
   }
 
-  const kindOf = (i) => parsedOverrides[i] ?? parsed[i]?.secret ?? false;
+  function togglePasted(i) {
+    pasteRows = pasteRows.map((r, n) => (n === i ? { ...r, secret: !r.secret } : r));
+  }
+
+  function openPaste() {
+    pasteText = '';
+    pasteRows = [];
+    pasting = true;
+  }
 
   function applyPaste() {
-    const incoming = usable.map((row) => ({
-      key: row.key,
-      value: row.value,
-      secret: kindOf(parsed.indexOf(row)),
-    }));
+    const incoming = pasteRows
+      .filter((r) => r.valid)
+      .map((r) => ({ key: r.key, value: r.value, secret: r.secret }));
     if (!incoming.length) return;
 
-    const keys = new Set(incoming.map((r) => r.key));
-    vars = [...vars.filter((v) => !keys.has(v.key)), ...incoming];
-    pasteText = '';
-    parsedOverrides = {};
+    vars = mergeEnvRows(vars, incoming);
     pasting = false;
+    pasteText = '';
+    pasteRows = [];
   }
 </script>
 
@@ -119,7 +122,7 @@
         variant="ghost"
         size="sm"
         class="h-7 rounded-lg"
-        onclick={() => ((pasteText = ''), (parsedOverrides = {}), (pasting = true))}
+        onclick={openPaste}
       >
         <ClipboardPaste class="size-3.5" /> Paste .env
       </Button>
@@ -142,7 +145,7 @@
     <div class="space-y-1.5">
       {#each vars as v, i (i)}
         {@const dup = v.key && duplicates.has(v.key)}
-        {@const bad = v.key && !KEY_RE.test(v.key)}
+        {@const bad = v.key && !ENV_KEY_RE.test(v.key)}
         <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] items-center gap-1.5">
           <div
             class={cn(
@@ -234,9 +237,9 @@
           bind:value={draft.key}
           placeholder="DATABASE_URL"
           spellcheck="false"
-          class={cn('font-mono text-xs', draft.key && !KEY_RE.test(draft.key) && 'border-bad/60')}
+          class={cn('font-mono text-xs', draft.key && !ENV_KEY_RE.test(draft.key) && 'border-bad/60')}
         />
-        {#if draft.key && !KEY_RE.test(draft.key)}
+        {#if draft.key && !ENV_KEY_RE.test(draft.key)}
           <p class="text-bad text-[11.5px]">
             Letters, digits and underscore, not starting with a digit.
           </p>
@@ -301,7 +304,7 @@
       <Button variant="ghost" onclick={() => (adding = false)}>Cancel</Button>
       <Button
         class="accent-fill rounded-xl px-4 font-semibold"
-        disabled={!draft.key.trim() || !KEY_RE.test(draft.key.trim())}
+        disabled={!draft.key.trim() || !ENV_KEY_RE.test(draft.key.trim())}
         onclick={commitAdd}
       >
         <Plus class="size-4" /> Add
@@ -322,19 +325,20 @@
 
     <div class="space-y-3.5">
       <Textarea
-        bind:value={pasteText}
+        value={pasteText}
+        oninput={(e) => onPaste(e.currentTarget.value)}
         rows={6}
         spellcheck="false"
         placeholder={'DATABASE_URL=postgres://…\nexport STRIPE_SECRET_KEY="sk_live_…"\nPORT=3000'}
         class="font-mono text-[11.5px]"
       />
 
-      {#if parsed.length}
+      {#if pasteRows.length}
         <div class="flex flex-wrap items-center gap-2">
           <span class="eyebrow">{usable.length} variable{usable.length === 1 ? '' : 's'}</span>
-          {#if usable.filter((r) => kindOf(parsed.indexOf(r))).length}
+          {#if pastedSecrets}
             <span class="accent-wash tabular rounded-full px-2 py-0.5 font-mono text-[10px]">
-              {usable.filter((r) => kindOf(parsed.indexOf(r))).length} secret
+              {pastedSecrets} secret
             </span>
           {/if}
           {#if rejected.length}
@@ -345,8 +349,8 @@
         </div>
 
         <div class="panel max-h-72 space-y-1 overflow-y-auto rounded-xl p-2">
-          {#each parsed as row, i (row.key + i)}
-            {@const secret = kindOf(i)}
+          {#each pasteRows as row, i (row.key + i)}
+            {@const secret = row.secret}
             <div
               class={cn(
                 'grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] items-center gap-2 rounded-lg px-2 py-1.5',

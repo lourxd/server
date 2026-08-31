@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseEnvText, looksSecret, unquote } from '../src/lib/env-format.js';
+import { parseEnvText, looksSecret, unquote, mergeEnvRows } from '../src/lib/env-format.js';
 
 test('parses a pasted .env the way people actually paste it', () => {
   const rows = parseEnvText(`
@@ -53,4 +53,31 @@ test('nothing in, nothing out', () => {
   assert.deepEqual(parseEnvText(''), []);
   assert.deepEqual(parseEnvText(null), []);
   assert.deepEqual(parseEnvText('# only a comment\n\n'), []);
+});
+
+test('merging keeps what is not being replaced, in order', () => {
+  const current = [
+    { key: 'PORT', value: '3000', secret: false },
+    { key: 'DATABASE_URL', value: '', secret: true, stored: true },
+  ];
+  const merged = mergeEnvRows(current, [{ key: 'DATABASE_URL', value: 'new', secret: true }]);
+  assert.deepEqual(merged.map((r) => r.key), ['PORT', 'DATABASE_URL']);
+  assert.equal(merged[1].value, 'new', 'the incoming row wins');
+  assert.equal(merged[1].stored, undefined, 'and replaces it outright rather than merging');
+});
+
+test('merging a paste keeps every kind the preview decided', () => {
+  const incoming = parseEnvText('NODE_ENV=production\nSTRIPE_SECRET_KEY=sk_live_x')
+    .filter((r) => r.valid)
+    .map((r) => ({ key: r.key, value: r.value, secret: r.secret }));
+  const merged = mergeEnvRows([{ key: 'PORT', value: '3000', secret: false }], incoming);
+  assert.deepEqual(
+    merged.map((r) => [r.key, r.secret]),
+    [['PORT', false], ['NODE_ENV', false], ['STRIPE_SECRET_KEY', true]],
+  );
+});
+
+test('merging nothing changes nothing', () => {
+  const current = [{ key: 'PORT', value: '3000', secret: false }];
+  assert.deepEqual(mergeEnvRows(current, []), current);
 });
