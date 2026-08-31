@@ -1,6 +1,6 @@
 <script>
   import { invalidateAll } from '$app/navigation';
-  import { api, streamPost, toasts, live } from '$lib/live.svelte.js';
+  import { api, toasts, live } from '$lib/live.svelte.js';
   import { cn } from '$lib/utils.js';
 
   import { Button } from '$lib/components/ui/button/index.js';
@@ -10,7 +10,6 @@
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import * as Alert from '$lib/components/ui/alert/index.js';
   import ConfirmDialog from './ConfirmDialog.svelte';
-  import LogStream from './LogStream.svelte';
 
   import Cloud from '@lucide/svelte/icons/cloud';
   import Plus from '@lucide/svelte/icons/plus';
@@ -20,14 +19,11 @@
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import CircleAlert from '@lucide/svelte/icons/circle-alert';
-  import Download from '@lucide/svelte/icons/download';
   import Link2 from '@lucide/svelte/icons/link-2';
 
   let { data } = $props();
 
   let busy = $state(null);
-  let installing = $state(false);
-  let installLines = $state([]);
 
   let createOpen = $state(false);
   let kind = $state('named');
@@ -51,19 +47,6 @@
       .filter(Boolean),
   );
 
-  async function installBinary() {
-    installing = true;
-    installLines = [];
-    try {
-      await streamPost('/api/tunnels/install', {}, (event, payload) => {
-        if (event === 'line') installLines = [...installLines, payload];
-      });
-      toasts.ok('cloudflared installed');
-      await invalidateAll();
-    } finally {
-      installing = false;
-    }
-  }
 
   async function act(id, action, body = {}) {
     busy = id;
@@ -148,35 +131,26 @@
     <CircleAlert class="size-4" />
     <Alert.Description class="space-y-2 text-xs">
       <p>{data.cloudflare.reason ?? 'Cloudflare is not connected.'}</p>
-      <Button variant="outline" size="sm" class="h-7" href="/settings?tab=cloudflare">Add a token</Button>
+      <Button variant="outline" size="sm" class="h-7" href="/settings?tab=cloudflare">
+        Open Cloudflare setup
+      </Button>
     </Alert.Description>
   </Alert.Root>
 {/if}
 
 {#if !data.binary.installed}
-  <div class="panel space-y-3 rounded-2xl p-4.5">
-    <div class="flex flex-wrap items-center gap-3">
-      <div class="min-w-0 flex-1">
-        <p class="text-[14px] font-semibold">cloudflared is not installed</p>
-        <p class="text-muted-foreground mt-0.5 text-[12px]">
-          The connector that holds the outbound link to Cloudflare. Downloads into
-          <code class="font-mono">~/.local/bin</code> — no sudo.
-        </p>
-      </div>
-      <Button
-        size="sm"
-        class="accent-fill h-8.5 rounded-xl px-4 font-semibold"
-        disabled={installing}
-        onclick={installBinary}
-      >
-        {#if installing}<LoaderCircle class="size-3.5 animate-spin" />{:else}<Download class="size-3.5" />{/if}
-        {installing ? 'Installing…' : 'Install'}
+  <Alert.Root>
+    <CircleAlert class="size-4" />
+    <Alert.Description class="space-y-2 text-xs">
+      <p>
+        cloudflared is not installed, so no tunnel can run here. Settings walks through the whole
+        setup — token, connector, then a tunnel.
+      </p>
+      <Button variant="outline" size="sm" class="h-7" href="/settings?tab=cloudflare">
+        Open Cloudflare setup
       </Button>
-    </div>
-    {#if installLines.length}
-      <LogStream lines={installLines} height="200px" />
-    {/if}
-  </div>
+    </Alert.Description>
+  </Alert.Root>
 {:else}
   <div class="text-muted-foreground flex flex-wrap items-center gap-2 font-mono text-[10.5px]">
     <span class="dot text-ok"></span>

@@ -320,6 +320,16 @@ in parallel makes the second collide with the first and reports every free port
 as taken. `ports.js` does this and names the holder by matching its PID against
 the PM2 list.
 
+**`~/.local/bin` is not on a systemd unit's PATH either.** Installing
+`cloudflared` there worked and the panel then reported it as not installed, so
+the button appeared to do nothing. `exec.js` adds both the Node bin directory
+and `~/.local/bin` to every child's PATH and to `which()`, which is where the
+panel puts anything it installs without sudo.
+
+**Cloudflare setup lives in Settings and nowhere else.** Network and an app's
+Network tab detect what is missing and link to `/settings?tab=cloudflare`; they
+do not carry their own installer. One place to get it right.
+
 **A systemd unit's PATH has no nvm directory.** The unit starts the panel with
 an absolute path to node, so the panel itself runs — but every spawned `npm`,
 `npx`, `pnpm` or `yarn` fails with `spawn npm ENOENT`, and only after a clone

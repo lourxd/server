@@ -149,7 +149,9 @@
         <CircleAlert class="size-4" />
         <Alert.Description class="space-y-2 text-xs">
           <p>cloudflared is not installed, so no tunnel can run on this machine.</p>
-          <Button variant="outline" size="sm" class="h-7" href="/network">Install it</Button>
+          <Button variant="outline" size="sm" class="h-7" href="/settings?tab=cloudflare">
+            Install it
+          </Button>
         </Alert.Description>
       </Alert.Root>
     {:else if !named.length}

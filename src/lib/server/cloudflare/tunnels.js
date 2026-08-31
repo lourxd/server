@@ -30,7 +30,7 @@ export function binaryStatus() {
     if (!binPath) {
       return { installed: false, path: null, version: null, installHint: installHint() };
     }
-    const ver = await run('cloudflared', ['--version'], { timeout: 5000 });
+    const ver = await run(binPath, ['--version'], { timeout: 5000 });
     return {
       installed: true,
       path: binPath,

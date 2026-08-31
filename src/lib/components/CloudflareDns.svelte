@@ -205,7 +205,9 @@
     <CircleAlert class="size-4" />
     <Alert.Description class="space-y-2 text-xs">
       <p>{data.cloudflare.reason ?? 'Cloudflare is not connected.'}</p>
-      <Button variant="outline" size="sm" class="h-7" href="/settings?tab=cloudflare">Add a token</Button>
+      <Button variant="outline" size="sm" class="h-7" href="/settings?tab=cloudflare">
+        Open Cloudflare setup
+      </Button>
     </Alert.Description>
   </Alert.Root>
 {:else if !data.zones.length}

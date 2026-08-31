@@ -1,13 +1,17 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 
 const NODE_BIN_DIR = path.dirname(process.execPath);
+const USER_BIN_DIR = path.join(os.homedir(), '.local', 'bin');
+
+export const EXTRA_PATH = [NODE_BIN_DIR, USER_BIN_DIR];
 
 function withNodeOnPath(pathValue) {
   const parts = (pathValue || '').split(path.delimiter).filter(Boolean);
-  if (parts.includes(NODE_BIN_DIR)) return pathValue;
-  return [NODE_BIN_DIR, ...parts].join(path.delimiter);
+  const missing = EXTRA_PATH.filter((dir) => !parts.includes(dir));
+  return missing.length ? [...missing, ...parts].join(path.delimiter) : pathValue;
 }
 
 function childEnv(env) {
