@@ -478,6 +478,11 @@ Do not treat these as bugs to discover — they are known and deferred.
   Running an authoritative nameserver on the box is not viable: port 53 is
   EACCES for the panel's user, `systemd-resolved` already holds 127.0.0.53:53,
   and the machine is behind NAT (192.168.50.227 vs 85.246.175.66).
+- **`shapeProcess` is the only place app metadata gets read out of PM2's env.**
+  `list()` drops the raw env, so anything the UI needs — `stack`, `port`,
+  `dbId`, `dbVar` — has to be lifted there. A component reaching for
+  `app.env?.PORT` silently gets `undefined`, which is how the route dialog's app
+  shortcuts never once appeared.
 - **An app's Network tab is a shortcut into the Network page, not a second
   implementation.** It finds routes whose service matches this app's `PORT` and
   adds one through the same `/api/tunnels` actions. Installing `cloudflared` and

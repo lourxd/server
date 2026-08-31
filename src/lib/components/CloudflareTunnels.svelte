@@ -20,6 +20,10 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import CircleAlert from '@lucide/svelte/icons/circle-alert';
   import Link2 from '@lucide/svelte/icons/link-2';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import Boxes from '@lucide/svelte/icons/boxes';
+  import TechLogo from './TechLogo.svelte';
+  import { STACK_BY_ID } from '$lib/stacks.js';
 
   let { data } = $props();
 
@@ -31,21 +35,22 @@
 
   let routeOpen = $state(false);
   let routeTarget = $state(null);
-  let route = $state({ hostname: '', service: 'http://localhost:3000' });
+  let route = $state({ hostname: '', service: '' });
+  let custom = $state(false);
 
   let confirmOpen = $state(false);
   let confirmState = $state({ title: '', description: '', label: '', action: null });
 
   const ready = $derived(data.cloudflare.connected && data.binary.installed);
 
-  const appTargets = $derived(
-    live.apps
-      .map((a) => {
-        const port = a.env?.PORT;
-        return port ? { name: a.name, service: `http://localhost:${port}` } : null;
-      })
-      .filter(Boolean),
+  const targets = $derived(
+    [...live.apps]
+      .sort((a, b) => Number(!!b.port) - Number(!!a.port) || a.name.localeCompare(b.name))
+      .map((a) => ({ ...a, service: a.port ? `http://localhost:${a.port}` : null })),
   );
+
+  const chosenApp = $derived(targets.find((a) => a.service === route.service) ?? null);
+  const routeValid = $derived(!!route.hostname.trim() && !!route.service.trim());
 
 
   async function act(id, action, body = {}) {
@@ -77,7 +82,9 @@
 
   function openRoute(tunnel) {
     routeTarget = tunnel;
-    route = { hostname: '', service: 'http://localhost:3000' };
+    const first = live.apps.find((a) => a.port);
+    route = { hostname: '', service: first ? `http://localhost:${first.port}` : '' };
+    custom = !first;
     routeOpen = true;
   }
 
@@ -371,50 +378,118 @@
 </Dialog.Root>
 
 <Dialog.Root bind:open={routeOpen}>
-  <Dialog.Content class="sm:max-w-lg">
+  <Dialog.Content class="max-h-[88vh] overflow-y-auto sm:max-w-xl">
     <Dialog.Header>
       <Dialog.Title>Route a hostname</Dialog.Title>
       <Dialog.Description>
-        A proxied CNAME is written to Cloudflare and the ingress rule is pushed to the tunnel.
+        A proxied CNAME is written to Cloudflare and the ingress rule is pushed to
+        {routeTarget?.name}.
       </Dialog.Description>
     </Dialog.Header>
 
     <div class="space-y-4">
       <div class="space-y-1.5">
         <Label for="route-host">Hostname</Label>
-        <Input id="route-host" bind:value={route.hostname} placeholder="app.example.com" class="font-mono text-xs" />
+        <Input
+          id="route-host"
+          bind:value={route.hostname}
+          placeholder="app.example.com"
+          spellcheck="false"
+          class="font-mono text-xs"
+        />
         {#if data.zones.length}
           <p class="text-muted-foreground text-[11.5px]">
             Zones on this account: {data.zones.map((z) => z.name).join(', ')}
           </p>
         {/if}
       </div>
-      <div class="space-y-1.5">
-        <Label for="route-service">Local service</Label>
-        <Input id="route-service" bind:value={route.service} class="font-mono text-xs" />
-        {#if appTargets.length}
-          <div class="flex flex-wrap gap-1.5 pt-1">
-            {#each appTargets as t (t.name)}
+
+      <div class="space-y-2">
+        <Label>Send it to</Label>
+
+        {#if targets.length}
+          <div class="grid gap-2 sm:grid-cols-2">
+            {#each targets as app (app.pmId)}
               <button
                 type="button"
-                onclick={() => (route.service = t.service)}
-                class="panel hover:brightness-125 rounded-lg px-2 py-1 font-mono text-[10.5px]"
+                disabled={!app.port}
+                onclick={() => ((route.service = app.service), (custom = false))}
+                class={cn(
+                  'flex items-center gap-2.5 rounded-xl p-3 text-left transition-all',
+                  !app.port && 'cursor-not-allowed opacity-45',
+                  !custom && route.service === app.service ? 'accent-wash' : 'panel hover:brightness-125',
+                )}
               >
-                {t.name}
+                <div class="bg-foreground/6 grid size-8 shrink-0 place-items-center rounded-lg">
+                  {#if app.stack && STACK_BY_ID[app.stack]}
+                    <TechLogo name={STACK_BY_ID[app.stack].logo} class="size-4" />
+                  {:else}
+                    <Boxes class="size-4" />
+                  {/if}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-[13px] font-medium">{app.name}</p>
+                  <p class="text-muted-foreground truncate font-mono text-[10.5px]">
+                    {app.port ? `localhost:${app.port}` : 'no PORT set'}
+                  </p>
+                </div>
+                <span
+                  class="dot shrink-0"
+                  style="color:{app.status === 'online' ? 'var(--ok)' : 'var(--idle)'}"
+                ></span>
               </button>
             {/each}
+
+            <button
+              type="button"
+              onclick={() => ((custom = true), (route.service = ''))}
+              class={cn(
+                'flex items-center gap-2.5 rounded-xl p-3 text-left transition-all',
+                custom ? 'accent-wash' : 'panel hover:brightness-125',
+              )}
+            >
+              <div class="bg-foreground/6 grid size-8 shrink-0 place-items-center rounded-lg">
+                <Link2 class="size-4" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-[13px] font-medium">Something else</p>
+                <p class="text-muted-foreground truncate font-mono text-[10.5px]">any local address</p>
+              </div>
+            </button>
           </div>
         {/if}
+
+        {#if custom || !targets.length}
+          <Input
+            bind:value={route.service}
+            placeholder="http://localhost:8080"
+            spellcheck="false"
+            class="font-mono text-xs"
+          />
+        {/if}
+
+        {#if !targets.length}
+          <p class="text-muted-foreground text-[11.5px]">
+            Nothing is running under PM2 yet, so there is no app to pick.
+          </p>
+        {/if}
       </div>
+
+      {#if routeValid}
+        <div class="accent-wash flex flex-wrap items-center gap-2 rounded-xl p-3 font-mono text-[11.5px]">
+          <span class="truncate">{route.hostname.trim()}</span>
+          <ArrowRight class="text-muted-foreground size-3.5 shrink-0" />
+          <span class="truncate">{chosenApp ? chosenApp.name : route.service}</span>
+          {#if chosenApp}
+            <span class="text-muted-foreground truncate">{route.service}</span>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <Dialog.Footer>
       <Button variant="outline" onclick={() => (routeOpen = false)}>Cancel</Button>
-      <Button
-        class="accent-fill rounded-xl px-4 font-semibold"
-        disabled={!!busy || !route.hostname.trim()}
-        onclick={addRoute}
-      >
+      <Button class="accent-fill rounded-xl px-4 font-semibold" disabled={!!busy || !routeValid} onclick={addRoute}>
         <Link2 class="size-4" /> Add route
       </Button>
     </Dialog.Footer>

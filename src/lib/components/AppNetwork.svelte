@@ -18,6 +18,7 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import CircleAlert from '@lucide/svelte/icons/circle-alert';
 
   let { data, app } = $props();
@@ -221,9 +222,11 @@
         </Select.Root>
       </div>
 
-      <div class="accent-wash rounded-xl p-3">
-        <p class="eyebrow mb-1">Traffic will go to</p>
-        <p class="font-mono text-[12px]">{service}</p>
+      <div class="accent-wash flex flex-wrap items-center gap-2 rounded-xl p-3 font-mono text-[11.5px]">
+        <span class="truncate">{hostname.trim() || 'your hostname'}</span>
+        <ArrowRight class="text-muted-foreground size-3.5 shrink-0" />
+        <span class="truncate">{app.name}</span>
+        <span class="text-muted-foreground truncate">{service}</span>
       </div>
     </div>
 
