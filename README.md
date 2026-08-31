@@ -176,10 +176,12 @@ and reconnects to the daemon on its own.
 - **Network** — Inbound/outbound rates and totals, 4-minute throughput history,
   gateway and resolvers, per-interface addressing (IPv4, MAC, link speed, MTU)
   with error and drop counters, and every listening port joined back to the app
-  that owns it. Two more tabs: **Tunnels** publishes an app to the internet
-  through Cloudflare with no inbound port open — named tunnels on your own
-  hostnames, or throwaway `trycloudflare.com` ones — and **DNS** manages records
-  per zone with a Check that resolves against 1.1.1.1 and 8.8.8.8.
+  that owns it.
+- **Tunnels** — Publish an app to the internet with no inbound port open. Named
+  tunnels on your own hostnames, or throwaway `trycloudflare.com` ones; route a
+  hostname by picking a running app rather than typing a URL.
+- **DNS** — Records per zone: create, edit, delete, proxy toggle, and a Check
+  that resolves against 1.1.1.1 and 8.8.8.8 so you see what the internet sees.
 - **Apps** — Live list; start, stop, restart, reload, delete, `pm2 save`. Per-app
   detail in tabs — Overview, Environment, Database, Logs — with a live log
   stream, and a Build view beside it holding the output of the last build the
@@ -328,5 +330,5 @@ src/
     format.js              byte/duration/relative-time helpers
   routes/
     api/                   health, stream, apps, logs, repos, db, tunnels, dns, settings, auth
-    apps/ repos/ databases/ network/ settings/ login/ setup/
+    apps/ repos/ databases/ tunnels/ dns/ network/ settings/ login/ setup/
 ```

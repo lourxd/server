@@ -13,6 +13,8 @@
   import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
   import Boxes from '@lucide/svelte/icons/boxes';
   import Network from '@lucide/svelte/icons/network';
+  import Cloud from '@lucide/svelte/icons/cloud';
+  import Globe from '@lucide/svelte/icons/globe';
   import GitFork from '@lucide/svelte/icons/git-fork';
   import Database from '@lucide/svelte/icons/database';
   import Settings from '@lucide/svelte/icons/settings';
@@ -46,6 +48,8 @@
     { href: '/apps', label: 'Apps', icon: Boxes },
     { href: '/repos', label: 'Repositories', icon: GitFork },
     { href: '/databases', label: 'Databases', icon: Database },
+    { href: '/tunnels', label: 'Tunnels', icon: Cloud },
+    { href: '/dns', label: 'DNS', icon: Globe },
     { href: '/network', label: 'Network', icon: Network },
   ];
 

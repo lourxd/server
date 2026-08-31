@@ -782,8 +782,8 @@
               <span class="text-muted-foreground min-w-0 flex-1 truncate font-mono text-[11.5px]">
                 {cfNamed} named · route a hostname from an app's Network tab
               </span>
-              <Button variant="ghost" size="sm" class="panel h-8 shrink-0 rounded-lg px-3" href="/network">
-                Open Network <ArrowRight class="size-3.5" />
+              <Button variant="ghost" size="sm" class="panel h-8 shrink-0 rounded-lg px-3" href="/tunnels">
+                Open Tunnels <ArrowRight class="size-3.5" />
               </Button>
             </div>
           {/if}

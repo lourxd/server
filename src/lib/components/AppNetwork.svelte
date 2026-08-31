@@ -156,7 +156,7 @@
         <CircleAlert class="size-4" />
         <Alert.Description class="space-y-2 text-xs">
           <p>No named tunnel exists yet. One tunnel can carry every hostname on this machine.</p>
-          <Button variant="outline" size="sm" class="h-7" href="/network">Create one</Button>
+          <Button variant="outline" size="sm" class="h-7" href="/tunnels">Create one</Button>
         </Alert.Description>
       </Alert.Root>
     {/if}

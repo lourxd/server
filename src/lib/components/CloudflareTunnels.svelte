@@ -153,8 +153,8 @@
     <CircleAlert class="size-4" />
     <Alert.Description class="space-y-2 text-xs">
       <p>
-        cloudflared is not installed, so no tunnel can run here. Settings walks through the whole
-        setup — token, connector, then a tunnel.
+        cloudflared is not installed, so no tunnel can run here. Settings walks through the setup —
+        token, account, then the connector.
       </p>
       <Button variant="outline" size="sm" class="h-7" href="/settings?tab=cloudflare">
         Open Cloudflare setup

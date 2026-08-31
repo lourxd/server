@@ -142,7 +142,7 @@ src/
       exec.js realtime.js sse.js cache.js
   routes/
     api/                  json + sse endpoints
-    apps/ repos/ databases/ network/ settings/ login/ setup/
+    apps/ repos/ databases/ tunnels/ dns/ network/ settings/ login/ setup/
 ```
 
 **`server/store/` vs `server/db/` is the distinction people get wrong.**
@@ -506,9 +506,10 @@ Do not treat these as bugs to discover — they are known and deferred.
   adds one through the same `/api/tunnels` actions. Installing `cloudflared` and
   creating a tunnel stay on the Network page; the tab links there rather than
   duplicating them.
-- **Tunnels and DNS live as tabs on Network**, not as pages of their own — a
-  route and the interface it exits through are the same question. The backend
-  (`server/cloudflare/`) was always intact; only the UI had been removed.
+- **Tunnels and DNS are pages of their own.** They were tabs on Network for a
+  while; ingress is used far more than interface telemetry and buried badly
+  there. Network is machine networking again — throughput, interfaces, listening
+  ports. Setup still lives only in Settings; Tunnels and DNS link there.
 - Deploy-wizard inner steps beyond the stack tiles are not fully restyled.
 - Connection state is no longer surfaced anywhere in the UI. `live.connected`
   still tracks it and reconnects; a dropped stream shows as stale numbers with
